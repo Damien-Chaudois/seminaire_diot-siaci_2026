@@ -28,7 +28,18 @@ public sealed class BoolToVisibilityInverseConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Truncates a string to ConverterParameter characters.</summary>
+/// <summary>non-empty string → Visible, empty/null → Collapsed</summary>
+public sealed class NonEmptyStringToVisibilityConverter : IValueConverter
+{
+    public static readonly NonEmptyStringToVisibilityConverter Instance = new();
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is string s && s.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 public sealed class TruncateConverter : IValueConverter
 {
     public static readonly TruncateConverter Instance = new();

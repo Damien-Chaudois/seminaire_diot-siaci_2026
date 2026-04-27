@@ -2,12 +2,11 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
-using System.Windows.Controls;
-using System.Windows.Media;
 using Microsoft.Win32;
 using BLL;
 using DAL.Models;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace wpf.ViewModels;
 
@@ -15,7 +14,16 @@ public class PersonalityOption : ViewModelBase
 {
     private bool _isSelected;
     private string _name;
-    private string _promptInstruction;
+    private string _roleDescription;
+    private int _curiosity;
+    private int _competence;
+    private int _practicality;
+    private int _aestheticSensitivity;
+    private int _rigor;
+    private bool _limitedVisionFlag;
+    private bool _elderlyFlag;
+    private bool _lowMobilityFlag;
+    private bool _lowDigitalLiteracyFlag;
 
     public string Name
     {
@@ -23,10 +31,64 @@ public class PersonalityOption : ViewModelBase
         set => SetProperty(ref _name, value);
     }
 
-    public string PromptInstruction
+    public string RoleDescription
     {
-        get => _promptInstruction;
-        set => SetProperty(ref _promptInstruction, value);
+        get => _roleDescription;
+        set => SetProperty(ref _roleDescription, value);
+    }
+
+    public int Curiosity
+    {
+        get => _curiosity;
+        set => SetProperty(ref _curiosity, value);
+    }
+
+    public int Competence
+    {
+        get => _competence;
+        set => SetProperty(ref _competence, value);
+    }
+
+    public int Practicality
+    {
+        get => _practicality;
+        set => SetProperty(ref _practicality, value);
+    }
+
+    public int AestheticSensitivity
+    {
+        get => _aestheticSensitivity;
+        set => SetProperty(ref _aestheticSensitivity, value);
+    }
+
+    public int Rigor
+    {
+        get => _rigor;
+        set => SetProperty(ref _rigor, value);
+    }
+
+    public bool LimitedVisionFlag
+    {
+        get => _limitedVisionFlag;
+        set => SetProperty(ref _limitedVisionFlag, value);
+    }
+
+    public bool ElderlyFlag
+    {
+        get => _elderlyFlag;
+        set => SetProperty(ref _elderlyFlag, value);
+    }
+
+    public bool LowMobilityFlag
+    {
+        get => _lowMobilityFlag;
+        set => SetProperty(ref _lowMobilityFlag, value);
+    }
+
+    public bool LowDigitalLiteracyFlag
+    {
+        get => _lowDigitalLiteracyFlag;
+        set => SetProperty(ref _lowDigitalLiteracyFlag, value);
     }
 
     public bool IsSelected
@@ -43,11 +105,50 @@ public class PersonalityOption : ViewModelBase
 
     public Action? SelectionChanged { get; set; }
 
-    public PersonalityOption(string name, string promptInstruction)
+    public PersonalityOption(string name, string roleDescription)
     {
         _name = name;
-        _promptInstruction = promptInstruction;
+        _roleDescription = roleDescription;
     }
+
+    public string BuildSystemPrompt()
+    {
+        var flags = new List<string>();
+        if (LimitedVisionFlag) flags.Add("vision limitée");
+        if (ElderlyFlag) flags.Add("personne âgée");
+        if (LowMobilityFlag) flags.Add("motricité réduite");
+        if (LowDigitalLiteracyFlag) flags.Add("faible aisance numérique");
+
+        var flagsText = flags.Count == 0
+            ? "aucune contrainte particulière"
+            : string.Join(", ", flags);
+
+        string DescribeLevel(int value) => value switch
+        {
+            <= 20 => "très faible",
+            <= 40 => "faible",
+            <= 60 => "modéré",
+            <= 80 => "élevé",
+            _     => "très élevé"
+        };
+
+        return
+            $"Tu es {Name}, {RoleDescription}. " +
+            $"Tu as les traits de personnalité suivants : " +
+            $"curiosité {DescribeLevel(Curiosity)} ({Curiosity}/100), " +
+            $"compétence technique {DescribeLevel(Competence)} ({Competence}/100), " +
+            $"pragmatisme {DescribeLevel(Practicality)} ({Practicality}/100), " +
+            $"sensibilité esthétique {DescribeLevel(AestheticSensitivity)} ({AestheticSensitivity}/100), " +
+            $"rigueur {DescribeLevel(Rigor)} ({Rigor}/100). " +
+            (flags.Count > 0 ? $"Tu as les caractéristiques suivantes : {flagsText}. " : "") +
+            "Reste dans ce personnage tout au long de ta réponse : ton ton, tes priorités et ta façon d'évaluer doivent refléter fidèlement cette personnalité. " +
+            "Analyse uniquement l'interface visible sur l'image fournie par l'utilisateur. " +
+            "Commence ta réponse par une ligne au format exact : NOTE: x/5 (avec x un entier entre 0 et 5). " +
+            "Puis fournis une critique concrète et actionnnable structurée en trois sections : Points forts, Points faibles, Recommandations prioritaires.";
+    }
+
+    [System.Obsolete("Use BuildSystemPrompt() instead.")]
+    public string BuildInstruction() => BuildSystemPrompt();
 }
 
 public class PersonalityCritique : ViewModelBase
@@ -55,7 +156,9 @@ public class PersonalityCritique : ViewModelBase
     private bool _isExpanded;
 
     public string PersonalityName { get; }
+    public double Rating { get; }
     public string CritiqueText { get; }
+    public string RatingDisplay => $"{Rating:0.0}/5";
 
     public bool IsExpanded
     {
@@ -63,9 +166,10 @@ public class PersonalityCritique : ViewModelBase
         set => SetProperty(ref _isExpanded, value);
     }
 
-    public PersonalityCritique(string personalityName, string critiqueText)
+    public PersonalityCritique(string personalityName, double rating, string critiqueText)
     {
         PersonalityName = personalityName;
+        Rating = rating;
         CritiqueText = critiqueText;
     }
 }
@@ -75,6 +179,8 @@ public class MainViewModel : ViewModelBase
     private readonly IImageService _imageService;
     private readonly ILlmService _llmService;
     private readonly IHistoryService _historyService;
+    private readonly Services.IApiService _apiService;
+    private PersonalityOption? _editingPersonality;
 
     // ── Image ────────────────────────────────────────────────────────────────
     private string _currentBase64 = string.Empty;
@@ -85,11 +191,70 @@ public class MainViewModel : ViewModelBase
     // ── Personalities ─────────────────────────────────────────────────────────
     public ObservableCollection<PersonalityOption> Personalities { get; } = [];
 
+    private int _selectedTabIndex;
+    public int SelectedTabIndex { get => _selectedTabIndex; set => SetProperty(ref _selectedTabIndex, value); }
+
+    private string _personalityFormTitle = "Creation d'une personnalite";
+    public string PersonalityFormTitle { get => _personalityFormTitle; set => SetProperty(ref _personalityFormTitle, value); }
+
+    private string _personalityEditorName = string.Empty;
+    public string PersonalityEditorName { get => _personalityEditorName; set => SetProperty(ref _personalityEditorName, value); }
+
+    private string _personalityEditorRole = string.Empty;
+    public string PersonalityEditorRole { get => _personalityEditorRole; set => SetProperty(ref _personalityEditorRole, value); }
+
+    private int _editorCuriosity = 60;
+    public int EditorCuriosity { get => _editorCuriosity; set => SetProperty(ref _editorCuriosity, value); }
+
+    private int _editorCompetence = 60;
+    public int EditorCompetence { get => _editorCompetence; set => SetProperty(ref _editorCompetence, value); }
+
+    private int _editorPracticality = 60;
+    public int EditorPracticality { get => _editorPracticality; set => SetProperty(ref _editorPracticality, value); }
+
+    private int _editorAestheticSensitivity = 60;
+    public int EditorAestheticSensitivity { get => _editorAestheticSensitivity; set => SetProperty(ref _editorAestheticSensitivity, value); }
+
+    private int _editorRigor = 60;
+    public int EditorRigor { get => _editorRigor; set => SetProperty(ref _editorRigor, value); }
+
+    private bool _editorLimitedVisionFlag;
+    public bool EditorLimitedVisionFlag { get => _editorLimitedVisionFlag; set => SetProperty(ref _editorLimitedVisionFlag, value); }
+
+    private bool _editorElderlyFlag;
+    public bool EditorElderlyFlag { get => _editorElderlyFlag; set => SetProperty(ref _editorElderlyFlag, value); }
+
+    private bool _editorLowMobilityFlag;
+    public bool EditorLowMobilityFlag { get => _editorLowMobilityFlag; set => SetProperty(ref _editorLowMobilityFlag, value); }
+
+    private bool _editorLowDigitalLiteracyFlag;
+    public bool EditorLowDigitalLiteracyFlag { get => _editorLowDigitalLiteracyFlag; set => SetProperty(ref _editorLowDigitalLiteracyFlag, value); }
+
     private string _selectedPersonalitiesSummary = "Aucune personnalité sélectionnée";
     public string SelectedPersonalitiesSummary
     {
         get => _selectedPersonalitiesSummary;
         set => SetProperty(ref _selectedPersonalitiesSummary, value);
+    }
+
+    // ── Modeles IA ───────────────────────────────────────────────────────────
+    public ObservableCollection<string> AvailableModels { get; } = [];
+
+    private string _selectedModel = string.Empty;
+    public string SelectedModel
+    {
+        get => _selectedModel;
+        set
+        {
+            if (!SetProperty(ref _selectedModel, value))
+                return;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            _apiService.SetModel(value);
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     // ── Result ────────────────────────────────────────────────────────────────
@@ -108,6 +273,16 @@ public class MainViewModel : ViewModelBase
     private bool _hasImage;
     public bool HasImage { get => _hasImage; set => SetProperty(ref _hasImage, value); }
 
+    // ── API Key Banner ────────────────────────────────────────────────────────
+    private bool _apiKeyMissing;
+    public bool ApiKeyMissing { get => _apiKeyMissing; set => SetProperty(ref _apiKeyMissing, value); }
+
+    private string _apiKeyInput = string.Empty;
+    public string ApiKeyInput { get => _apiKeyInput; set => SetProperty(ref _apiKeyInput, value); }
+
+    private string _apiKeyValidationError = string.Empty;
+    public string ApiKeyValidationError { get => _apiKeyValidationError; set => SetProperty(ref _apiKeyValidationError, value); }
+
     // ── Commands ─────────────────────────────────────────────────────────────
     public ICommand SelectImageCommand { get; }
     public ICommand SendToApiCommand { get; }
@@ -115,34 +290,96 @@ public class MainViewModel : ViewModelBase
     public ICommand DeleteHistoryCommand { get; }
     public ICommand EditPersonalityCommand { get; }
     public ICommand AddPersonalityCommand { get; }
+    public ICommand SavePersonalityCommand { get; }
+    public ICommand CancelPersonalityCommand { get; }
+    public ICommand ResetCommand { get; }
+    public ICommand ValidateApiKeyCommand { get; }
 
-    public MainViewModel(IImageService imageService, ILlmService llmService, IHistoryService historyService)
+    public MainViewModel(IImageService imageService, ILlmService llmService, IHistoryService historyService, Services.IApiService apiService)
     {
         _imageService = imageService;
         _llmService = llmService;
         _historyService = historyService;
+        _apiService = apiService;
 
         SelectImageCommand = new RelayCommand(_ => SelectImage());
-        SendToApiCommand = new RelayCommandAsync(_ => SendToApiAsync(), _ => HasImage && !IsLoading);
+        SendToApiCommand = new RelayCommandAsync(_ => SendToApiAsync(), _ => HasImage && !IsLoading && !string.IsNullOrWhiteSpace(SelectedModel));
         RestoreHistoryCommand = new RelayCommand(entry => RestoreHistory(entry as HistoryEntry));
         DeleteHistoryCommand = new RelayCommand(entry => DeleteHistory(entry as HistoryEntry));
-        EditPersonalityCommand = new RelayCommand(entry => EditPersonality(entry as PersonalityOption));
-        AddPersonalityCommand = new RelayCommand(_ => AddPersonality());
+        EditPersonalityCommand = new RelayCommand(entry => OpenPersonalityEditor(entry as PersonalityOption));
+        AddPersonalityCommand = new RelayCommand(_ => OpenCreatePersonalityEditor());
+        SavePersonalityCommand = new RelayCommand(_ => SavePersonality());
+        CancelPersonalityCommand = new RelayCommand(_ => CancelPersonalityEdit());
+        ResetCommand = new RelayCommand(_ => ResetInterface());
+        ValidateApiKeyCommand = new RelayCommandAsync(_ => ValidateApiKeyAsync(), _ => !string.IsNullOrWhiteSpace(ApiKeyInput));
 
+        ApiKeyMissing = !_apiService.HasApiKey;
+
+        InitializeModels();
         InitializePersonalities();
         LoadHistory();
+    }
+
+    private void InitializeModels()
+    {
+        AvailableModels.Clear();
+        foreach (var model in _apiService.GetAvailableModels())
+            AvailableModels.Add(model);
+
+        if (AvailableModels.Count == 0)
+        {
+            _selectedModel = string.Empty;
+            OnPropertyChanged(nameof(SelectedModel));
+            StatusMessage = "Aucun modele configure. Ajoutez MODEL_NAMES ou MODEL_NAME dans .env.";
+            CommandManager.InvalidateRequerySuggested();
+            return;
+        }
+
+        _selectedModel = _apiService.CurrentModel;
+        OnPropertyChanged(nameof(SelectedModel));
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    private async Task ValidateApiKeyAsync()
+    {
+        ApiKeyValidationError = string.Empty;
+        var key = ApiKeyInput.Trim();
+
+        var valid = await _apiService.ValidateApiKeyAsync(key);
+
+        if (valid)
+        {
+            _apiService.SetApiKey(key);
+            ApiKeyMissing = false;
+            StatusMessage = "Clé API validée.";
+        }
+        else
+        {
+            ApiKeyValidationError = "Clé invalide ou accès refusé. Vérifiez votre Personal Access Token GitHub.";
+        }
     }
 
     private void InitializePersonalities()
     {
         var defaults = new[]
         {
-            new PersonalityOption("UX Coach", "Analyse l'intuitivite, la clarte des parcours et la comprehension immediate de l'interface."),
-            new PersonalityOption("Art Director", "Analyse la beaute visuelle, la coherence graphique, la hierarchie visuelle et l'impact esthetique."),
-            new PersonalityOption("Product Designer", "Analyse l'elegance des interactions, la structure des informations et la qualite des composants."),
-            new PersonalityOption("Power User", "Analyse la praticite, la vitesse d'execution des taches et l'efficacite operationnelle."),
-            new PersonalityOption("Accessibility Expert", "Analyse l'accessibilite : contrastes, lisibilite, taille des zones cliquables et inclusion."),
-            new PersonalityOption("Conversion Specialist", "Analyse la capacite de l'interface a guider vers les actions principales et a reduire les frictions.")
+            new PersonalityOption("Camille", "UX Coach: analyse l'intuitivite, la clarte des parcours et la comprehension immediate.")
+            {
+                Curiosity = 70, Competence = 85, Practicality = 90, AestheticSensitivity = 55, Rigor = 80
+            },
+            new PersonalityOption("Leo", "Art Director: analyse la beaute visuelle, la coherence graphique et l'impact esthetique.")
+            {
+                Curiosity = 65, Competence = 88, Practicality = 45, AestheticSensitivity = 95, Rigor = 72
+            },
+            new PersonalityOption("Nora", "Accessibility Expert: analyse lisibilite, contrastes, tailles cliquables et inclusion.")
+            {
+                Curiosity = 75, Competence = 92, Practicality = 82, AestheticSensitivity = 58, Rigor = 96,
+                LimitedVisionFlag = true, ElderlyFlag = true
+            },
+            new PersonalityOption("Yanis", "Power User: analyse vitesse d'execution des taches et efficacite operationnelle.")
+            {
+                Curiosity = 55, Competence = 80, Practicality = 96, AestheticSensitivity = 40, Rigor = 78
+            }
         };
 
         Personalities.Clear();
@@ -151,6 +388,9 @@ public class MainViewModel : ViewModelBase
             item.SelectionChanged = UpdateSelectedPersonalitiesSummary;
             Personalities.Add(item);
         }
+
+        SetEditorDefaults();
+        SelectedTabIndex = 0;
 
         UpdateSelectedPersonalitiesSummary();
     }
@@ -190,6 +430,12 @@ public class MainViewModel : ViewModelBase
 
     private async Task SendToApiAsync()
     {
+        if (string.IsNullOrWhiteSpace(SelectedModel))
+        {
+            MessageBox.Show("Selectionnez un modele IA avant de lancer la critique.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         var selectedPersonalities = Personalities.Where(p => p.IsSelected).ToList();
         if (selectedPersonalities.Count == 0)
         {
@@ -208,15 +454,12 @@ public class MainViewModel : ViewModelBase
             {
                 StatusMessage = $"Analyse en cours : {personality.Name}...";
 
-                var personalityPrompt =
-                    $"Tu dois adopter strictement la personnalite suivante : {personality.Name}. " +
-                    $"{personality.PromptInstruction} " +
-                    "Analyse uniquement l'interface visible sur l'image. " +
-                    "Fais une critique concrete et actionnable en sections : Points forts, Points faibles, Recommandations prioritaires.";
+                var personalityPrompt = personality.BuildSystemPrompt();
 
-                var critique = await _llmService.AnalyzeImageAsync(_currentBase64, _currentExtension, personalityPrompt);
+                var rawCritique = await _llmService.AnalyzeImageAsync(_currentBase64, _currentExtension, personalityPrompt);
+                var (rating, critique) = ExtractRatingAndBody(rawCritique);
 
-                critiques.Add(new PersonalityCritique(personality.Name, critique.Trim())
+                critiques.Add(new PersonalityCritique(personality.Name, rating, critique.Trim())
                 {
                     IsExpanded = false
                 });
@@ -233,6 +476,7 @@ public class MainViewModel : ViewModelBase
                 ImageBase64 = _currentBase64,
                 ImageExtension = _currentExtension,
                 SelectedPersonalitiesCsv = string.Join(";", selectedPersonalities.Select(p => p.Name)),
+                RatingsCsv = string.Join(";", critiques.Select(c => $"{c.PersonalityName}:{c.Rating:0.0}/5")),
                 ResultText = combinedResult,
                 CreatedAt = DateTime.Now
             };
@@ -275,6 +519,7 @@ public class MainViewModel : ViewModelBase
         }
 
         UpdateSelectedPersonalitiesSummary();
+        SelectedTabIndex = 0;
 
         StatusMessage = $"Historique restauré : {entry.CreatedAt:dd/MM/yyyy HH:mm}";
     }
@@ -301,130 +546,129 @@ public class MainViewModel : ViewModelBase
             HistoryEntries.Add(entry);
     }
 
-    private void AddPersonality()
+    private void OpenCreatePersonalityEditor()
     {
-        var name = PromptForText("Nouvelle personnalite", "Nom de la personnalite :", string.Empty, false);
-        if (name is null)
-            return;
-
-        var sanitizedName = name.Trim();
-        if (string.IsNullOrWhiteSpace(sanitizedName))
-        {
-            MessageBox.Show("Le nom est obligatoire.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        if (Personalities.Any(p => string.Equals(p.Name, sanitizedName, StringComparison.OrdinalIgnoreCase)))
-        {
-            MessageBox.Show("Une personnalite avec ce nom existe deja.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        var prompt = PromptForText("Prompt de personnalite", "Prompt de role :", string.Empty, true);
-        if (prompt is null)
-            return;
-
-        var item = new PersonalityOption(sanitizedName, prompt.Trim()) { SelectionChanged = UpdateSelectedPersonalitiesSummary };
-        Personalities.Add(item);
-        item.IsSelected = true;
-        StatusMessage = $"Personnalite ajoutee : {item.Name}";
+        _editingPersonality = null;
+        PersonalityFormTitle = "Creation d'une personnalite";
+        SetEditorDefaults();
+        SelectedTabIndex = 1;
     }
 
-    private void EditPersonality(PersonalityOption? personality)
+    private void OpenPersonalityEditor(PersonalityOption? personality)
     {
         if (personality is null)
             return;
 
-        var updatedPrompt = PromptForText(
-            $"Editer {personality.Name}",
-            "Prompt de role :",
-            personality.PromptInstruction,
-            true);
-
-        if (updatedPrompt is null)
-            return;
-
-        personality.PromptInstruction = updatedPrompt.Trim();
-        StatusMessage = $"Prompt mis a jour : {personality.Name}";
+        _editingPersonality = personality;
+        PersonalityFormTitle = $"Edition de {personality.Name}";
+        PersonalityEditorName = personality.Name;
+        PersonalityEditorRole = personality.RoleDescription;
+        EditorCuriosity = personality.Curiosity;
+        EditorCompetence = personality.Competence;
+        EditorPracticality = personality.Practicality;
+        EditorAestheticSensitivity = personality.AestheticSensitivity;
+        EditorRigor = personality.Rigor;
+        EditorLimitedVisionFlag = personality.LimitedVisionFlag;
+        EditorElderlyFlag = personality.ElderlyFlag;
+        EditorLowMobilityFlag = personality.LowMobilityFlag;
+        EditorLowDigitalLiteracyFlag = personality.LowDigitalLiteracyFlag;
+        SelectedTabIndex = 1;
     }
 
-    private static string? PromptForText(string title, string label, string initialText, bool multiline)
+    private void SavePersonality()
     {
-        var window = new Window
+        var name = PersonalityEditorName.Trim();
+        var role = PersonalityEditorRole.Trim();
+
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(role))
         {
-            Title = title,
-            Width = multiline ? 640 : 520,
-            Height = multiline ? 420 : 220,
-            ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = new SolidColorBrush(Color.FromRgb(0x1B, 0x1C, 0x24)),
-            Foreground = Brushes.White
-        };
+            MessageBox.Show("Le nom et le role sont obligatoires.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-        if (Application.Current?.MainWindow is not null)
-            window.Owner = Application.Current.MainWindow;
-
-        var grid = new Grid { Margin = new Thickness(14) };
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var textLabel = new TextBlock
+        if (_editingPersonality is null && Personalities.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            Text = label,
-            Margin = new Thickness(0, 0, 0, 8),
-            Foreground = new SolidColorBrush(Color.FromRgb(0xB3, 0xBC, 0xD3))
-        };
-        Grid.SetRow(textLabel, 0);
-        grid.Children.Add(textLabel);
+            MessageBox.Show("Une personnalite avec ce nom existe deja.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-        var editor = new TextBox
+        if (_editingPersonality is not null &&
+            !string.Equals(_editingPersonality.Name, name, StringComparison.OrdinalIgnoreCase) &&
+            Personalities.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            Text = initialText,
-            AcceptsReturn = multiline,
-            TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
-            VerticalScrollBarVisibility = multiline ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled,
-            Background = new SolidColorBrush(Color.FromRgb(0x31, 0x38, 0x4B)),
-            Foreground = Brushes.White,
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x4F, 0x69)),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(8),
-            MinHeight = multiline ? 260 : 34
-        };
-        Grid.SetRow(editor, 1);
-        grid.Children.Add(editor);
+            MessageBox.Show("Une personnalite avec ce nom existe deja.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-        var buttonRow = new StackPanel
+        if (_editingPersonality is null)
         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 10, 0, 0)
-        };
-
-        var cancelButton = new Button
+            var created = new PersonalityOption(name, role)
+            {
+                SelectionChanged = UpdateSelectedPersonalitiesSummary
+            };
+            ApplyEditorValuesTo(created);
+            Personalities.Add(created);
+            created.IsSelected = true;
+            StatusMessage = $"Personnalite ajoutee : {created.Name}";
+        }
+        else
         {
-            Content = "Annuler",
-            MinWidth = 90,
-            Margin = new Thickness(0, 0, 8, 0)
-        };
-        cancelButton.Click += (_, _) => window.DialogResult = false;
+            _editingPersonality.Name = name;
+            _editingPersonality.RoleDescription = role;
+            ApplyEditorValuesTo(_editingPersonality);
+            StatusMessage = $"Personnalite mise a jour : {_editingPersonality.Name}";
+        }
 
-        var saveButton = new Button
-        {
-            Content = "Valider",
-            MinWidth = 90
-        };
-        saveButton.Click += (_, _) => window.DialogResult = true;
+        UpdateSelectedPersonalitiesSummary();
+        _editingPersonality = null;
+        SelectedTabIndex = 0;
+    }
 
-        buttonRow.Children.Add(cancelButton);
-        buttonRow.Children.Add(saveButton);
-        Grid.SetRow(buttonRow, 2);
-        grid.Children.Add(buttonRow);
+    private void CancelPersonalityEdit()
+    {
+        _editingPersonality = null;
+        SetEditorDefaults();
+        SelectedTabIndex = 0;
+    }
 
-        window.Content = grid;
+    private void ResetInterface()
+    {
+        _currentBase64 = string.Empty;
+        _currentExtension = "jpeg";
+        PreviewImage = null;
+        HasImage = false;
+        IsLoading = false;
+        Critiques.Clear();
+        InitializePersonalities();
+        StatusMessage = "Interface reinitialisee.";
+    }
 
-        var result = window.ShowDialog();
-        return result == true ? editor.Text : null;
+    private void SetEditorDefaults()
+    {
+        PersonalityEditorName = string.Empty;
+        PersonalityEditorRole = string.Empty;
+        EditorCuriosity = 60;
+        EditorCompetence = 60;
+        EditorPracticality = 60;
+        EditorAestheticSensitivity = 60;
+        EditorRigor = 60;
+        EditorLimitedVisionFlag = false;
+        EditorElderlyFlag = false;
+        EditorLowMobilityFlag = false;
+        EditorLowDigitalLiteracyFlag = false;
+    }
+
+    private void ApplyEditorValuesTo(PersonalityOption personality)
+    {
+        personality.Curiosity = EditorCuriosity;
+        personality.Competence = EditorCompetence;
+        personality.Practicality = EditorPracticality;
+        personality.AestheticSensitivity = EditorAestheticSensitivity;
+        personality.Rigor = EditorRigor;
+        personality.LimitedVisionFlag = EditorLimitedVisionFlag;
+        personality.ElderlyFlag = EditorElderlyFlag;
+        personality.LowMobilityFlag = EditorLowMobilityFlag;
+        personality.LowDigitalLiteracyFlag = EditorLowDigitalLiteracyFlag;
     }
 
     private static string SerializeCritiques(IEnumerable<PersonalityCritique> critiques)
@@ -438,7 +682,7 @@ public class MainViewModel : ViewModelBase
                 builder.AppendLine();
             }
 
-            builder.AppendLine($"=== {critique.PersonalityName} ===");
+            builder.AppendLine($"=== {critique.PersonalityName} | {critique.Rating:0.0}/5 ===");
             builder.AppendLine(critique.CritiqueText.Trim());
         }
 
@@ -452,19 +696,22 @@ public class MainViewModel : ViewModelBase
         var lines = normalized.Split('\n');
 
         string? currentName = null;
+        double currentRating = 0;
         var currentText = new StringBuilder();
 
         foreach (var line in lines)
         {
-            if (line.StartsWith("=== ") && line.EndsWith(" ===") && line.Length > 8)
+            var headerMatch = Regex.Match(line, "^===\\s*(.+?)\\s*\\|\\s*([0-5](?:[.,]\\d+)?)\\s*/5\\s*===$");
+            if (headerMatch.Success)
             {
                 if (!string.IsNullOrWhiteSpace(currentName))
                 {
-                    result.Add(new PersonalityCritique(currentName, currentText.ToString().Trim()) { IsExpanded = false });
+                    result.Add(new PersonalityCritique(currentName, currentRating, currentText.ToString().Trim()) { IsExpanded = false });
                     currentText.Clear();
                 }
 
-                currentName = line[4..^4].Trim();
+                currentName = headerMatch.Groups[1].Value.Trim();
+                currentRating = ParseRating(headerMatch.Groups[2].Value);
                 continue;
             }
 
@@ -472,12 +719,37 @@ public class MainViewModel : ViewModelBase
         }
 
         if (!string.IsNullOrWhiteSpace(currentName))
-            result.Add(new PersonalityCritique(currentName, currentText.ToString().Trim()) { IsExpanded = false });
+            result.Add(new PersonalityCritique(currentName, currentRating, currentText.ToString().Trim()) { IsExpanded = false });
 
         if (result.Count == 0 && !string.IsNullOrWhiteSpace(raw))
-            result.Add(new PersonalityCritique("Critique", raw.Trim()) { IsExpanded = false });
+            result.Add(new PersonalityCritique("Critique", 0, raw.Trim()) { IsExpanded = false });
 
         return result;
+    }
+
+    private static (double Rating, string Body) ExtractRatingAndBody(string rawCritique)
+    {
+        var ratingMatch = Regex.Match(rawCritique, "NOTE\\s*:\\s*([0-5](?:[.,]\\d+)?)\\s*/\\s*5", RegexOptions.IgnoreCase);
+        var rating = ratingMatch.Success ? ParseRating(ratingMatch.Groups[1].Value) : 0;
+
+        var body = Regex.Replace(
+            rawCritique,
+            "^\\s*NOTE\\s*:\\s*[0-5](?:[.,]\\d+)?\\s*/\\s*5\\s*$",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Multiline).Trim();
+
+        return (rating, body);
+    }
+
+    private static double ParseRating(string value)
+    {
+        if (double.TryParse(value.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var rating))
+        {
+            if (rating < 0) return 0;
+            if (rating > 5) return 5;
+            return rating;
+        }
+        return 0;
     }
 
     private static BitmapImage LoadBitmapFromFile(string path)

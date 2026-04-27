@@ -33,7 +33,7 @@ public partial class App : Application
         ILlmService llmService = new LlmService(apiService);
         IHistoryService historyService = new HistoryService(historyRepo);
 
-        var viewModel = new MainViewModel(imageService, llmService, historyService);
+        var viewModel = new MainViewModel(imageService, llmService, historyService, apiService);
         var window = new MainWindow(viewModel);
         window.Show();
     }

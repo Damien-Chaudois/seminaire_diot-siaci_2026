@@ -12,6 +12,7 @@
         <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <local:BoolToVisibilityInverseConverter x:Key="BoolToVisInv"/>
         <local:TruncateConverter x:Key="Truncate"/>
+        <local:NonEmptyStringToVisibilityConverter x:Key="NonEmptyToVis"/>
 
         <SolidColorBrush x:Key="BgPanel" Color="#262A38"/>
         <SolidColorBrush x:Key="BgCard" Color="#31384B"/>
@@ -103,154 +104,446 @@
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
+
+        <Style x:Key="DarkCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+        </Style>
+
+        <Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="{StaticResource BgCard}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="#3A4360"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#465173"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="{StaticResource BgCard}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="ComboBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    SnapsToDevicePixels="True">
+                                <ToggleButton Focusable="False"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                              ClickMode="Press">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border Background="Transparent" BorderThickness="0">
+                                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="28"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <ContentPresenter Grid.Column="0"
+                                                          Margin="8,3,4,3"
+                                                          HorizontalAlignment="Left"
+                                                          VerticalAlignment="Center"
+                                                          Content="{TemplateBinding SelectionBoxItem}"
+                                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+
+                                        <Border Grid.Column="1"
+                                                Background="#3A4360"
+                                                CornerRadius="0,6,6,0"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="1,0,0,0">
+                                            <Path Width="10"
+                                                  Height="6"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Fill="{TemplateBinding Foreground}"
+                                                  Data="M 0 0 L 10 0 L 5 6 Z"/>
+                                        </Border>
+                                    </Grid>
+                                </ToggleButton>
+                            </Border>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Slide"
+                                   Focusable="False">
+                                <Border Margin="0,4,0,0"
+                                        Background="{StaticResource BgCard}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer MaxHeight="260" CanContentScroll="True">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TraitSlider" TargetType="Slider">
+            <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+            <Setter Property="Background" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,2,8,2"/>
+        </Style>
+
+        <Style x:Key="TraitValueText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Background" Value="#1E2433"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="MinWidth" Value="36"/>
+            <Setter Property="Padding" Value="4,1"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="280"/>
-            <ColumnDefinition Width="14"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="14"/>
-            <ColumnDefinition Width="360"/>
-        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Left: personalities -->
-        <Border Grid.Column="0" Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12">
+        <TabControl Grid.Row="0" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Foreground="{StaticResource TextPrimary}">
+            <TabItem Header="Critique">
+                <Grid Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="14"/>
+                        <ColumnDefinition Width="360"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="PERSONNALITES" Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Grid.Row="1" Text="Selectionnez les profils de testeur a utiliser pour la critique." Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,10" TextWrapping="Wrap"/>
+                            <Button Grid.Row="2" Content="Ajouter une personnalite" Style="{StaticResource SecondaryButton}" Command="{Binding AddPersonalityCommand}" Margin="0,0,0,10"/>
+
+                            <Border Grid.Row="3" Background="#222838" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="8">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding Personalities}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,6" Padding="8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Content="{Binding Name}" VerticalAlignment="Center"/>
+                                                        <Button Grid.Column="1" Content="Editer" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                                                Command="{Binding DataContext.EditPersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+
+                            <TextBlock Grid.Row="4" Text="{Binding SelectedPersonalitiesSummary}" Foreground="{StaticResource Accent}" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="300"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock Text="CRITIQUE D'INTERFACE PAR IA" Foreground="{StaticResource Accent}" FontSize="20" FontWeight="Bold"/>
+                            <TextBlock Text="Chargez un screenshot de l'application puis lancez la critique." Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Margin="0,0,0,10">
+                            <Grid>
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding HasImage, Converter={StaticResource BoolToVisInv}}">
+                                    <TextBlock Text="Aucune image selectionnee" Foreground="{StaticResource TextSecondary}"/>
+                                    <TextBlock Text="Formats acceptes : JPG / PNG" Foreground="{StaticResource TextSecondary}" FontSize="11" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Image Source="{Binding PreviewImage}" Stretch="Uniform" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}" Margin="8"/>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
+                            <TextBlock Text="Modele IA" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Width="220"
+                                      ItemsSource="{Binding AvailableModels}"
+                                      SelectedItem="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource DarkComboBox}"
+                                      Margin="0,0,12,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                <ComboBox.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#31384B"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#31384B"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#3A4360"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#3A4360"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F3F5FB"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F3F5FB"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#3A4360"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F5FB"/>
+                                </ComboBox.Resources>
+                            </ComboBox>
+                            <Button Style="{StaticResource PrimaryButton}" Content="Choisir une image" Command="{Binding SelectImageCommand}" Margin="0,0,10,0"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="Generer les critiques" Command="{Binding SendToApiCommand}" Margin="0,0,10,0"/>
+                            <Button Style="{StaticResource SecondaryButton}" Content="Reset" Command="{Binding ResetCommand}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                            <ProgressBar IsIndeterminate="True" Width="180" Height="6" VerticalAlignment="Center"/>
+                            <TextBlock Text="  Analyse en cours..." Foreground="{StaticResource Accent}" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Border Grid.Row="4" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
+                                <ItemsControl ItemsSource="{Binding Critiques}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,8" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                                <Expander.Header>
+                                                    <DockPanel LastChildFill="False">
+                                                        <TextBlock Text="{Binding PersonalityName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                                                        <TextBlock Text="{Binding RatingDisplay}" Foreground="{StaticResource Accent}" FontWeight="Bold"/>
+                                                    </DockPanel>
+                                                </Expander.Header>
+                                                <Border Background="#232938" Padding="10">
+                                                    <TextBlock Text="{Binding CritiqueText}" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </Expander>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Column="4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="HISTORIQUE" Style="{StaticResource SectionLabel}"/>
+                        <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="8">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding HistoryEntries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Button Grid.Column="0" Style="{StaticResource HistoryButton}" Command="{Binding DataContext.RestoreHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding CreatedAt, StringFormat='Session du {0:dd/MM/yyyy HH:mm}'}" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding SelectedPersonalitiesCsv}" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding RatingsCsv}" Foreground="{StaticResource Accent}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding ResultText, Converter={StaticResource Truncate}, ConverterParameter=80}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <Button Grid.Column="1" Content="X" Margin="4,3,0,3" Padding="8,4" Background="Transparent" Foreground="{StaticResource DangerColor}" BorderThickness="0" Cursor="Hand" ToolTip="Supprimer" Command="{Binding DataContext.DeleteHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Personalites">
+                <Grid Margin="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="380"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,0,10,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="{Binding PersonalityFormTitle}" Foreground="{StaticResource Accent}" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                            <TextBlock Grid.Row="1" Text="Nom" Style="{StaticResource SectionLabel}"/>
+                            <TextBox Grid.Row="2" Style="{StaticResource DarkTextBox}" Text="{Binding PersonalityEditorName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+
+                            <TextBlock Grid.Row="3" Text="Role" Style="{StaticResource SectionLabel}"/>
+                            <TextBox Grid.Row="4" Style="{StaticResource DarkTextBox}" Text="{Binding PersonalityEditorRole, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70" Margin="0,0,0,10"/>
+
+                            <TextBlock Grid.Row="5" Text="Traits du testeur (sliders)" Style="{StaticResource SectionLabel}"/>
+
+                            <Grid Grid.Row="6" Margin="0,0,0,10">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="44"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Curiosite" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Slider Grid.Row="0" Grid.Column="1" Style="{StaticResource TraitSlider}" Minimum="0" Maximum="100" Value="{Binding EditorCuriosity, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding EditorCuriosity}" Style="{StaticResource TraitValueText}" HorizontalAlignment="Right"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Competence" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Slider Grid.Row="1" Grid.Column="1" Style="{StaticResource TraitSlider}" Minimum="0" Maximum="100" Value="{Binding EditorCompetence, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding EditorCompetence}" Style="{StaticResource TraitValueText}" HorizontalAlignment="Right"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Praticite" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Slider Grid.Row="2" Grid.Column="1" Style="{StaticResource TraitSlider}" Minimum="0" Maximum="100" Value="{Binding EditorPracticality, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding EditorPracticality}" Style="{StaticResource TraitValueText}" HorizontalAlignment="Right"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Esthetique" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Slider Grid.Row="3" Grid.Column="1" Style="{StaticResource TraitSlider}" Minimum="0" Maximum="100" Value="{Binding EditorAestheticSensitivity, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding EditorAestheticSensitivity}" Style="{StaticResource TraitValueText}" HorizontalAlignment="Right"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Rigueur" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Slider Grid.Row="4" Grid.Column="1" Style="{StaticResource TraitSlider}" Minimum="0" Maximum="100" Value="{Binding EditorRigor, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding EditorRigor}" Style="{StaticResource TraitValueText}" HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <TextBlock Grid.Row="7" Text="Flags utilisateur" Style="{StaticResource SectionLabel}"/>
+                            <StackPanel Grid.Row="8" Margin="0,0,0,10">
+                                <CheckBox Style="{StaticResource DarkCheckBox}" Content="Vision limitee" IsChecked="{Binding EditorLimitedVisionFlag, Mode=TwoWay}"/>
+                                <CheckBox Style="{StaticResource DarkCheckBox}" Content="Personne agee" IsChecked="{Binding EditorElderlyFlag, Mode=TwoWay}"/>
+                                <CheckBox Style="{StaticResource DarkCheckBox}" Content="Motricite reduite" IsChecked="{Binding EditorLowMobilityFlag, Mode=TwoWay}"/>
+                                <CheckBox Style="{StaticResource DarkCheckBox}" Content="Faible aisance numerique" IsChecked="{Binding EditorLowDigitalLiteracyFlag, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource SecondaryButton}" Content="Annuler" Command="{Binding CancelPersonalityCommand}" Margin="0,0,8,0"/>
+                                <Button Style="{StaticResource PrimaryButton}" Content="Enregistrer" Command="{Binding SavePersonalityCommand}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Conseils" Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Text="- Donnez un nom memorable a la personnalite." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- Decrivez un role clair et sa maniere d'evaluer une interface." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- Ajustez les sliders pour simuler des styles de testeurs differents." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- Activez les flags pour simuler des contraintes reelles d'usage." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- API Key Alert Banner -->
+        <Border Grid.Row="1"
+                Background="#3A1F1E" BorderBrush="{StaticResource DangerColor}"
+                BorderThickness="0,1,0,0" Margin="-16,8,-16,0" Padding="16,10"
+                Visibility="{Binding ApiKeyMissing, Converter={StaticResource BoolToVis}}">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <TextBlock Grid.Row="0" Text="PERSONNALITES" Style="{StaticResource SectionLabel}"/>
-                <TextBlock Grid.Row="1" Text="Selectionnez une ou plusieurs personnalites d'analyse." Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,10" TextWrapping="Wrap"/>
-
-                <Button Grid.Row="2" Content="Ajouter une personnalite" Style="{StaticResource SecondaryButton}" Command="{Binding AddPersonalityCommand}" Margin="0,0,0,10"/>
-
-                <Border Grid.Row="3" Background="#222838" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="8">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Personalities}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,6" Padding="8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Content="{Binding Name}" VerticalAlignment="Center"/>
-                                            <Button Grid.Column="1" Content="Editer" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                                                    Command="{Binding DataContext.EditPersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                    CommandParameter="{Binding}"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
-
-                <TextBlock Grid.Row="4" Text="{Binding SelectedPersonalitiesSummary}" Foreground="{StaticResource Accent}" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="&#x26A0;  Clé API introuvable — renseignez votre GitHub PAT :"
+                           Foreground="{StaticResource DangerColor}" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="0,0,14,0"/>
+                <TextBox Grid.Column="1"
+                         Text="{Binding ApiKeyInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource DarkTextBox}"
+                         VerticalAlignment="Center" MaxHeight="34"/>
+                <Button Grid.Column="2" Content="Valider"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding ValidateApiKeyCommand}"
+                        Margin="10,0,0,0"/>
+                <TextBlock Grid.Column="3"
+                           Text="{Binding ApiKeyValidationError}"
+                           Foreground="{StaticResource DangerColor}"
+                           VerticalAlignment="Center" Margin="12,0,0,0"
+                           TextWrapping="Wrap" MaxWidth="360"
+                           Visibility="{Binding ApiKeyValidationError, Converter={StaticResource NonEmptyToVis}}"/>
             </Grid>
         </Border>
 
-        <!-- Center: upload + result -->
-        <Grid Grid.Column="2" Grid.Row="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="310"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                <TextBlock Text="CRITIQUE D'INTERFACE PAR IA" Foreground="{StaticResource Accent}" FontSize="20" FontWeight="Bold"/>
-                <TextBlock Text="Chargez un screenshot de l'application, puis lancez une critique par personnalite." Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-            </StackPanel>
-
-            <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Margin="0,0,0,10">
-                <Grid>
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding HasImage, Converter={StaticResource BoolToVisInv}}">
-                        <TextBlock Text="Aucune image selectionnee" Foreground="{StaticResource TextSecondary}"/>
-                        <TextBlock Text="Formats acceptes : JPG / PNG" Foreground="{StaticResource TextSecondary}" FontSize="11" HorizontalAlignment="Center"/>
-                    </StackPanel>
-                    <Image Source="{Binding PreviewImage}" Stretch="Uniform" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}" Margin="8"/>
-                </Grid>
-            </Border>
-
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-                <Button Style="{StaticResource PrimaryButton}" Content="Choisir une image" Command="{Binding SelectImageCommand}" Margin="0,0,10,0"/>
-                <Button Style="{StaticResource PrimaryButton}" Content="Generer les critiques" Command="{Binding SendToApiCommand}"/>
-            </StackPanel>
-
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
-                <ProgressBar IsIndeterminate="True" Width="180" Height="6" VerticalAlignment="Center"/>
-                <TextBlock Text="  Analyse en cours..." Foreground="{StaticResource Accent}" FontSize="12" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <Border Grid.Row="4" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
-                    <ItemsControl ItemsSource="{Binding Critiques}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Expander Header="{Binding PersonalityName}" IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,8" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <Border Background="#232938" Padding="10">
-                                        <TextBlock Text="{Binding CritiqueText}" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
-                                    </Border>
-                                </Expander>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </Border>
-        </Grid>
-
-        <!-- Right: history -->
-        <Grid Grid.Column="4" Grid.Row="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <TextBlock Grid.Row="0" Text="HISTORIQUE" Style="{StaticResource SectionLabel}"/>
-
-            <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="8">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding HistoryEntries}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,3">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <Button Grid.Column="0" Style="{StaticResource HistoryButton}" Command="{Binding DataContext.RestoreHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding CreatedAt, StringFormat='Session du {0:dd/MM/yyyy HH:mm}'}" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding SelectedPersonalitiesCsv}" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding ResultText, Converter={StaticResource Truncate}, ConverterParameter=80}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Button>
-
-                                    <Button Grid.Column="1" Content="X" Margin="4,3,0,3" Padding="8,4" Background="Transparent" Foreground="{StaticResource DangerColor}" BorderThickness="0" Cursor="Hand" ToolTip="Supprimer" Command="{Binding DataContext.DeleteHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </Border>
-        </Grid>
-
-        <Border Grid.Column="0" Grid.ColumnSpan="5" Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="-16,12,-16,-16" Padding="16,8">
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="-16,12,-16,-16" Padding="16,8">
             <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
         </Border>
     </Grid>
