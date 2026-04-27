@@ -8,4 +8,5 @@ public interface IPersonalityRepository
     IEnumerable<PersonalityEntry> GetAll();
     PersonalityEntry Insert(PersonalityEntry entry);
     void Update(PersonalityEntry entry);
+    void Delete(int id);
 }

@@ -10,6 +10,9 @@
     FontFamily="Segoe UI Variable Text, Segoe UI"
     GlowBrush="{DynamicResource AccentColorBrush}"
     WindowStartupLocation="CenterScreen"
+    WindowTitleBrush="#F4F7FB"
+    NonActiveWindowTitleBrush="#F4F7FB"
+    TitleForeground="Transparent"
     Background="#F4F7FB">
 
     <controls:MetroWindow.Resources>
@@ -26,6 +29,11 @@
         <SolidColorBrush x:Key="TextSecondary" Color="#6C757D"/>
         <SolidColorBrush x:Key="BorderColor" Color="#DDE3EE"/>
         <SolidColorBrush x:Key="DangerColor" Color="#DC3545"/>
+        <SolidColorBrush x:Key="TabIdle" Color="#EEF3FA"/>
+        <SolidColorBrush x:Key="TabHover" Color="#E7EDF6"/>
+        <SolidColorBrush x:Key="TabSelected" Color="#DCE5F0"/>
+        <SolidColorBrush x:Key="StarFilled" Color="#F4C542"/>
+        <SolidColorBrush x:Key="StarEmpty" Color="#B8941F"/>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource Accent}"/>
@@ -109,6 +117,12 @@
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
 
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="MinWidth" Value="40"/>
+            <Setter Property="MinHeight" Value="40"/>
+        </Style>
+
         <Style x:Key="DarkCheckBox" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
             <Setter Property="Margin" Value="0,4,0,4"/>
@@ -135,6 +149,7 @@
             <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
             <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItem}"/>
             <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -222,11 +237,21 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SettingsModelComboBox" TargetType="ComboBox" BasedOn="{StaticResource DarkComboBox}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ModelsMissing}" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource DangerColor}"/>
+                    <Setter Property="Background" Value="#FDEDED"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="TraitSlider" TargetType="Slider">
             <Setter Property="Foreground" Value="{StaticResource Accent}"/>
             <Setter Property="Background" Value="{StaticResource BorderColor}"/>
             <Setter Property="Height" Value="24"/>
             <Setter Property="Margin" Value="0,2,8,2"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
         </Style>
 
         <Style x:Key="TraitValueText" TargetType="TextBlock">
@@ -237,17 +262,66 @@
             <Setter Property="MinWidth" Value="36"/>
             <Setter Property="Padding" Value="4,1"/>
         </Style>
+
+        <Style TargetType="TabControl">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="RoundedTabItem" TargetType="TabItem">
+            <Setter Property="Background" Value="{StaticResource TabIdle}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Padding" Value="18,10"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10,10,0,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource TabSelected}"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                <Setter Property="Panel.ZIndex" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource TabHover}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource TabSelected}"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </controls:MetroWindow.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Foreground="{StaticResource TextPrimary}">
+        <TabControl Grid.Row="0" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Foreground="{StaticResource TextPrimary}" ItemContainerStyle="{StaticResource RoundedTabItem}">
             <TabItem Header="Critique">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Grid Margin="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="300"/>
@@ -284,16 +358,58 @@
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="17" Background="#E7EEF9" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                            <Image Source="{Binding AvatarImage}" Stretch="UniformToFill"/>
+                                                        <Border x:Name="AvatarHost" Grid.Column="0" Width="34" Height="34" CornerRadius="17" Background="#E7EEF9" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                            <Grid>
+                                                                <Image Source="{Binding AvatarImage}" Stretch="UniformToFill"/>
+                                                                <Button x:Name="AvatarRefreshButton"
+                                                                        Visibility="Collapsed"
+                                                                        Background="#80FFFFFF"
+                                                                        BorderThickness="0"
+                                                                        Cursor="Hand"
+                                                                        ToolTip="Regenerer l'avatar"
+                                                                        Command="{Binding DataContext.RegenerateAvatarCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}">
+                                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72C;" Foreground="{StaticResource TextPrimary}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Button>
+                                                                <Grid x:Name="AvatarSpinner" Visibility="Collapsed" Background="#80FFFFFF">
+                                                                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE895;" Foreground="{StaticResource Accent}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                                                        <TextBlock.RenderTransform>
+                                                                            <RotateTransform Angle="0"/>
+                                                                        </TextBlock.RenderTransform>
+                                                                        <TextBlock.Triggers>
+                                                                            <EventTrigger RoutedEvent="TextBlock.Loaded">
+                                                                                <BeginStoryboard>
+                                                                                    <Storyboard RepeatBehavior="Forever">
+                                                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.(RotateTransform.Angle)" From="0" To="360" Duration="0:0:0.9"/>
+                                                                                    </Storyboard>
+                                                                                </BeginStoryboard>
+                                                                            </EventTrigger>
+                                                                        </TextBlock.Triggers>
+                                                                    </TextBlock>
+                                                                </Grid>
+                                                            </Grid>
                                                         </Border>
 
                                                         <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Content="{Binding Name}" VerticalAlignment="Center"/>
-                                                        <Button Grid.Column="2" Content="Editer" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
-                                                                Command="{Binding DataContext.EditPersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                CommandParameter="{Binding}"/>
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                                                            <Button Content="Editer" Style="{StaticResource SecondaryButton}"
+                                                                    Command="{Binding DataContext.EditPersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"/>
+                                                            <Button Content="Supprimer" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Foreground="{StaticResource DangerColor}"
+                                                                    Command="{Binding DataContext.DeletePersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"/>
+                                                        </StackPanel>
                                                     </Grid>
                                                 </Border>
+                                                <DataTemplate.Triggers>
+                                                    <Trigger SourceName="AvatarHost" Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="AvatarRefreshButton" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                    <DataTrigger Binding="{Binding IsAvatarRefreshing}" Value="True">
+                                                        <Setter TargetName="AvatarRefreshButton" Property="Visibility" Value="Collapsed"/>
+                                                        <Setter TargetName="AvatarSpinner" Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -321,36 +437,18 @@
                         <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Margin="0,0,0,10">
                             <Grid>
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding HasImage, Converter={StaticResource BoolToVisInv}}">
-                                    <TextBlock Text="Aucune image selectionnee" Foreground="{StaticResource TextSecondary}"/>
-                                    <TextBlock Text="Formats acceptes : JPG / PNG" Foreground="{StaticResource TextSecondary}" FontSize="11" HorizontalAlignment="Center"/>
+                                    <Button Style="{StaticResource IconButton}" Command="{Binding SelectImageCommand}" ToolTip="Choisir une image">
+                                        <StackPanel>
+                                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE898;" FontSize="34" HorizontalAlignment="Center" Foreground="{StaticResource Accent}"/>
+                                            <TextBlock Text="JPG / PNG" Foreground="{StaticResource TextSecondary}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                                 <Image Source="{Binding PreviewImage}" Stretch="Uniform" Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}" Margin="8"/>
                             </Grid>
                         </Border>
 
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
-                            <TextBlock Text="Modele IA" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <ComboBox Width="220"
-                                      ItemsSource="{Binding AvailableModels}"
-                                      SelectedItem="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Style="{StaticResource DarkComboBox}"
-                                      Margin="0,0,12,0">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                                <ComboBox.Resources>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#E7EEF9"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#E7EEF9"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#1F2937"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#1F2937"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#D9E5F8"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F2937"/>
-                                </ComboBox.Resources>
-                            </ComboBox>
                             <Button Style="{StaticResource PrimaryButton}" Content="Choisir une image" Command="{Binding SelectImageCommand}" Margin="0,0,10,0"/>
                             <Button Style="{StaticResource PrimaryButton}" Content="Generer les critiques" Command="{Binding SendToApiCommand}" Margin="0,0,10,0"/>
                             <Button Style="{StaticResource SecondaryButton}" Content="Reset" Command="{Binding ResetCommand}"/>
@@ -370,7 +468,29 @@
                                                 <Expander.Header>
                                                     <DockPanel LastChildFill="False">
                                                         <TextBlock Text="{Binding PersonalityName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,8,0"/>
-                                                        <TextBlock Text="{Binding RatingDisplay}" Foreground="{StaticResource Accent}" FontWeight="Bold"/>
+                                                        <ItemsControl ItemsSource="{Binding StarStates}" ToolTip="{Binding RatingDisplay}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal"/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="★" FontSize="15" Margin="0,0,2,0">
+                                                                        <TextBlock.Style>
+                                                                            <Style TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="{StaticResource StarEmpty}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding}" Value="True">
+                                                                                        <Setter Property="Foreground" Value="{StaticResource StarFilled}"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </TextBlock.Style>
+                                                                    </TextBlock>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
                                                     </DockPanel>
                                                 </Expander.Header>
                                                 <Border Background="{StaticResource BgCard}" Padding="10">
@@ -405,9 +525,38 @@
                                                 <Button Grid.Column="0" Style="{StaticResource HistoryButton}" Command="{Binding DataContext.RestoreHistoryCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
                                                     <StackPanel>
                                                         <TextBlock Text="{Binding CreatedAt, StringFormat='Session du {0:dd/MM/yyyy HH:mm}'}" Foreground="{StaticResource Accent}" FontSize="11" FontWeight="SemiBold"/>
-                                                        <TextBlock Text="{Binding SelectedPersonalitiesCsv}" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="{Binding RatingsCsv}" Foreground="{StaticResource Accent}" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                                        <TextBlock Text="{Binding ResultText, Converter={StaticResource Truncate}, ConverterParameter=80}" Foreground="{StaticResource TextPrimary}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                        <ItemsControl ItemsSource="{Binding Ratings}" Margin="0,4,0,0">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <DockPanel LastChildFill="False" Margin="0,0,0,2">
+                                                                        <TextBlock Text="{Binding PersonalityName}" Foreground="{StaticResource TextPrimary}" FontSize="11" Margin="0,0,8,0"/>
+                                                                        <ItemsControl ItemsSource="{Binding StarStates}">
+                                                                            <ItemsControl.ItemsPanel>
+                                                                                <ItemsPanelTemplate>
+                                                                                    <StackPanel Orientation="Horizontal"/>
+                                                                                </ItemsPanelTemplate>
+                                                                            </ItemsControl.ItemsPanel>
+                                                                            <ItemsControl.ItemTemplate>
+                                                                                <DataTemplate>
+                                                                                    <TextBlock Text="★" FontSize="12" Margin="0,0,2,0">
+                                                                                        <TextBlock.Style>
+                                                                                            <Style TargetType="TextBlock">
+                                                                                                <Setter Property="Foreground" Value="{StaticResource StarEmpty}"/>
+                                                                                                <Style.Triggers>
+                                                                                                    <DataTrigger Binding="{Binding}" Value="True">
+                                                                                                        <Setter Property="Foreground" Value="{StaticResource StarFilled}"/>
+                                                                                                    </DataTrigger>
+                                                                                                </Style.Triggers>
+                                                                                            </Style>
+                                                                                        </TextBlock.Style>
+                                                                                    </TextBlock>
+                                                                                </DataTemplate>
+                                                                            </ItemsControl.ItemTemplate>
+                                                                        </ItemsControl>
+                                                                    </DockPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
                                                     </StackPanel>
                                                 </Button>
 
@@ -420,9 +569,11 @@
                         </Border>
                     </Grid>
                 </Grid>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="Personalites">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Grid Margin="14">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -522,50 +673,121 @@
                         <StackPanel>
                             <TextBlock Text="Conseils" Style="{StaticResource SectionLabel}"/>
                             <TextBlock Text="- Donnez un nom memorable a la personnalite." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                            <TextBlock Text="- Decrivez un role clair et sa maniere d'evaluer une interface." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- La description est optionnelle si le nom et les sliders suffisent a definir le profil." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBlock Text="- Ajustez les sliders pour simuler des styles de testeurs differents." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBlock Text="- Activez les flags pour simuler des contraintes reelles d'usage." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                         </StackPanel>
                     </Border>
                 </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="Parametres">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid Margin="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="340"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,0,10,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="Configuration" Foreground="{StaticResource Accent}" FontSize="20" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                            <TextBlock Grid.Row="1" Text="Cle API GitHub PAT" Style="{StaticResource SectionLabel}"/>
+                            <TextBox Grid.Row="2"
+                                     Text="{Binding ApiKeyInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,6">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBox}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ApiKeyMissing}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource DangerColor}"/>
+                                                <Setter Property="Background" Value="#FDEDED"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+
+                            <TextBlock Grid.Row="3"
+                                       Text="Aucune clé API détectée dans .env."
+                                       Foreground="{StaticResource DangerColor}"
+                                       Margin="0,0,0,10"
+                                       Visibility="{Binding ApiKeyMissing, Converter={StaticResource BoolToVis}}"/>
+
+                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,14">
+                                <Button Content="Valider la clé"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Command="{Binding ValidateApiKeyCommand}"/>
+                                <TextBlock Text="{Binding ApiKeyValidationError}"
+                                           Foreground="{StaticResource DangerColor}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding ApiKeyValidationError, Converter={StaticResource NonEmptyToVis}}"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="5" Text="Modele IA" Style="{StaticResource SectionLabel}"/>
+                            <ComboBox Grid.Row="6"
+                                      Width="320"
+                                      HorizontalAlignment="Left"
+                                      ItemsSource="{Binding AvailableModels}"
+                                      SelectedItem="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource SettingsModelComboBox}"
+                                      Margin="0,0,0,6">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimary}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                                <ComboBox.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#E7EEF9"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#E7EEF9"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#1F2937"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#1F2937"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#D9E5F8"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F2937"/>
+                                </ComboBox.Resources>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="7"
+                                       Text="Aucun modele trouvé dans .env. Configurez MODEL_NAMES ou MODEL_NAME."
+                                       Foreground="{StaticResource DangerColor}"
+                                       Margin="0,0,0,10"
+                                       Visibility="{Binding ModelsMissing, Converter={StaticResource BoolToVis}}"/>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Aide" Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Text="- Le champ de clé API est prérempli si GITHUB_PAT est trouvé dans .env." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- Si la clé ou les modèles sont absents, les champs deviennent rouges." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="- Au démarrage, l'application ouvre cet onglet automatiquement quand la configuration est incomplète." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 
-        <!-- API Key Alert Banner -->
-        <Border Grid.Row="1"
-                Background="#FDEDED" BorderBrush="{StaticResource DangerColor}"
-                BorderThickness="0,1,0,0" Margin="-16,8,-16,0" Padding="16,10"
-                Visibility="{Binding ApiKeyMissing, Converter={StaticResource BoolToVis}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
-                           Text="&#x26A0;  Clé API introuvable — renseignez votre GitHub PAT :"
-                           Foreground="{StaticResource DangerColor}" FontWeight="SemiBold"
-                           VerticalAlignment="Center" Margin="0,0,14,0"/>
-                <TextBox Grid.Column="1"
-                         Text="{Binding ApiKeyInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource DarkTextBox}"
-                         VerticalAlignment="Center" MaxHeight="34"/>
-                <Button Grid.Column="2" Content="Valider"
-                        Style="{StaticResource PrimaryButton}"
-                        Command="{Binding ValidateApiKeyCommand}"
-                        Margin="10,0,0,0"/>
-                <TextBlock Grid.Column="3"
-                           Text="{Binding ApiKeyValidationError}"
-                           Foreground="{StaticResource DangerColor}"
-                           VerticalAlignment="Center" Margin="12,0,0,0"
-                           TextWrapping="Wrap" MaxWidth="360"
-                           Visibility="{Binding ApiKeyValidationError, Converter={StaticResource NonEmptyToVis}}"/>
-            </Grid>
-        </Border>
-
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="-16,12,-16,-16" Padding="16,8">
+        <Border Grid.Row="1" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Margin="-16,12,-16,-16" Padding="16,8">
             <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
         </Border>
     </Grid>

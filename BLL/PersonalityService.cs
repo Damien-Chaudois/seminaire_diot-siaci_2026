@@ -8,6 +8,7 @@ public interface IPersonalityService
     IEnumerable<PersonalityEntry> GetPersonalities();
     PersonalityEntry CreatePersonality(PersonalityEntry entry);
     void UpdatePersonality(PersonalityEntry entry);
+    void DeletePersonality(int id);
 }
 
 public class PersonalityService : IPersonalityService
@@ -32,5 +33,10 @@ public class PersonalityService : IPersonalityService
     public void UpdatePersonality(PersonalityEntry entry)
     {
         _repository.Update(entry);
+    }
+
+    public void DeletePersonality(int id)
+    {
+        _repository.Delete(id);
     }
 }

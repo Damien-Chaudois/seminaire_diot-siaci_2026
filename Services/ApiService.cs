@@ -26,6 +26,7 @@ public class ApiService : IApiService
     }
 
     public bool HasApiKey => !string.IsNullOrWhiteSpace(_apiKey);
+    public string CurrentApiKey => _apiKey;
     public string CurrentModel => _model;
 
     public IReadOnlyList<string> GetAvailableModels()

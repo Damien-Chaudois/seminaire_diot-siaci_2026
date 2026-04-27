@@ -28,6 +28,7 @@ public class PersonalityOption : ViewModelBase
     private bool _elderlyFlag;
     private bool _lowMobilityFlag;
     private bool _lowDigitalLiteracyFlag;
+    private bool _isAvatarRefreshing;
 
     public int Id
     {
@@ -68,8 +69,16 @@ public class PersonalityOption : ViewModelBase
     public BitmapImage? AvatarImage
     {
         get => _avatarImage;
-        private set => SetProperty(ref _avatarImage, value);
+        private set
+        {
+            if (!SetProperty(ref _avatarImage, value))
+                return;
+
+            OnPropertyChanged(nameof(HasAvatar));
+        }
     }
+
+    public bool HasAvatar => AvatarImage is not null;
 
     public int Curiosity
     {
@@ -125,6 +134,12 @@ public class PersonalityOption : ViewModelBase
         set => SetProperty(ref _lowDigitalLiteracyFlag, value);
     }
 
+    public bool IsAvatarRefreshing
+    {
+        get => _isAvatarRefreshing;
+        set => SetProperty(ref _isAvatarRefreshing, value);
+    }
+
     public bool IsSelected
     {
         get => _isSelected;
@@ -168,6 +183,10 @@ public class PersonalityOption : ViewModelBase
             ? "aucune contrainte particulière"
             : string.Join(", ", flags);
 
+        var descriptionPart = string.IsNullOrWhiteSpace(RoleDescription)
+            ? string.Empty
+            : $", {RoleDescription.Trim()}";
+
         string DescribeLevel(int value) => value switch
         {
             <= 20 => "très faible",
@@ -178,7 +197,7 @@ public class PersonalityOption : ViewModelBase
         };
 
         return
-            $"Tu es {Name}, {RoleDescription}. " +
+            $"Tu es {Name}{descriptionPart}. " +
             $"Tu as les traits de personnalité suivants : " +
             $"curiosité {DescribeLevel(Curiosity)} ({Curiosity}/100), " +
             $"compétence technique {DescribeLevel(Competence)} ({Competence}/100), " +
@@ -227,6 +246,7 @@ public class PersonalityCritique : ViewModelBase
     public double Rating { get; }
     public string CritiqueText { get; }
     public string RatingDisplay => $"{Rating:0.0}/5";
+    public IEnumerable<bool> StarStates => Enumerable.Range(1, 5).Select(index => index <= Math.Clamp((int)Math.Floor(Rating), 0, 5));
 
     public bool IsExpanded
     {
@@ -329,6 +349,9 @@ public class MainViewModel : ViewModelBase
     // ── Modeles IA ───────────────────────────────────────────────────────────
     public ObservableCollection<string> AvailableModels { get; } = [];
 
+    private bool _modelsMissing;
+    public bool ModelsMissing { get => _modelsMissing; set => SetProperty(ref _modelsMissing, value); }
+
     private string _selectedModel = string.Empty;
     public string SelectedModel
     {
@@ -379,9 +402,11 @@ public class MainViewModel : ViewModelBase
     public ICommand DeleteHistoryCommand { get; }
     public ICommand EditPersonalityCommand { get; }
     public ICommand AddPersonalityCommand { get; }
+    public ICommand DeletePersonalityCommand { get; }
     public ICommand SavePersonalityCommand { get; }
     public ICommand CancelPersonalityCommand { get; }
     public ICommand GeneratePersonalityCommand { get; }
+    public ICommand RegenerateAvatarCommand { get; }
     public ICommand ResetCommand { get; }
     public ICommand ValidateApiKeyCommand { get; }
 
@@ -406,17 +431,23 @@ public class MainViewModel : ViewModelBase
         DeleteHistoryCommand = new RelayCommand(entry => DeleteHistory(entry as HistoryEntry));
         EditPersonalityCommand = new RelayCommand(entry => OpenPersonalityEditor(entry as PersonalityOption));
         AddPersonalityCommand = new RelayCommand(_ => OpenCreatePersonalityEditor());
+        DeletePersonalityCommand = new RelayCommand(entry => DeletePersonality(entry as PersonalityOption));
         SavePersonalityCommand = new RelayCommand(_ => SavePersonality());
         CancelPersonalityCommand = new RelayCommand(_ => CancelPersonalityEdit());
-        GeneratePersonalityCommand = new RelayCommandAsync(_ => GeneratePersonalityAsync(), _ => !IsLoading && !string.IsNullOrWhiteSpace(PersonalityEditorRole) && !string.IsNullOrWhiteSpace(SelectedModel));
+        GeneratePersonalityCommand = new RelayCommandAsync(_ => GeneratePersonalityAsync(), _ => !IsLoading && !string.IsNullOrWhiteSpace(PersonalityEditorName) && !string.IsNullOrWhiteSpace(SelectedModel));
+        RegenerateAvatarCommand = new RelayCommandAsync(entry => RegenerateAvatarAsync(entry as PersonalityOption), entry => entry is PersonalityOption personality && !personality.IsAvatarRefreshing);
         ResetCommand = new RelayCommand(_ => ResetInterface());
         ValidateApiKeyCommand = new RelayCommandAsync(_ => ValidateApiKeyAsync(), _ => !string.IsNullOrWhiteSpace(ApiKeyInput));
 
         ApiKeyMissing = !_apiService.HasApiKey;
+        ApiKeyInput = _apiService.CurrentApiKey;
 
         InitializeModels();
         InitializePersonalities();
         LoadHistory();
+
+        if (ApiKeyMissing || ModelsMissing)
+            SelectedTabIndex = 2;
     }
 
     private void InitializeModels()
@@ -424,6 +455,8 @@ public class MainViewModel : ViewModelBase
         AvailableModels.Clear();
         foreach (var model in _apiService.GetAvailableModels())
             AvailableModels.Add(model);
+
+        ModelsMissing = AvailableModels.Count == 0;
 
         if (AvailableModels.Count == 0)
         {
@@ -550,12 +583,6 @@ public class MainViewModel : ViewModelBase
         }
 
         var description = PersonalityEditorRole.Trim();
-        if (string.IsNullOrWhiteSpace(description))
-        {
-            MessageBox.Show("Renseignez une description avant de generer.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
         IsLoading = true;
         StatusMessage = "Generation IA de la personnalite en cours...";
 
@@ -564,8 +591,8 @@ public class MainViewModel : ViewModelBase
             var prompt = BuildPersonalityGenerationPrompt(description);
             PersonalityEditorFinal = (await _llmService.GenerateTesterPersonalityAsync(prompt)).Trim();
 
-            var seed = $"{PersonalityEditorName.Trim()}|{description}|{EditorCuriosity}-{EditorCompetence}-{EditorPracticality}-{EditorAestheticSensitivity}-{EditorRigor}";
-            EditorAvatarPngBase64 = await _diceBearAvatarService.GenerateAvatarPngBase64Async(seed);
+            var seed = BuildEditorAvatarSeed(forceFresh: false);
+            EditorAvatarPngBase64 = await _diceBearAvatarService.GenerateAvatarPngBase64Async(seed, PersonalityEditorName.Trim());
 
             StatusMessage = "Personnalite finale et avatar DiceBear generes.";
         }
@@ -594,8 +621,8 @@ public class MainViewModel : ViewModelBase
         return $"""
 Tu dois generer une personnalite de testeur UX/UI nommee {personalityName}.
 
-Description de base:
-{description}
+    Description de base:
+    {(string.IsNullOrWhiteSpace(description) ? "Aucune description libre fournie. Base-toi uniquement sur le nom, les traits et les contraintes." : description)}
 
 Traits (0 a 100):
 - curiosite: {EditorCuriosity}
@@ -610,6 +637,40 @@ Ecris en francais, en 1 bloc de texte concis (max 180 mots), sans markdown, sans
 Le texte doit decrire: ton, priorites, methode de test, type de critique, format de sortie exige avec NOTE /5 et recommandations prioritaires.
 Le resultat sera utilise tel quel comme instruction systeme lors d'une critique d'interface.
 """;
+    }
+
+    private async Task RegenerateAvatarAsync(PersonalityOption? personality)
+    {
+        if (personality is null)
+            return;
+
+        personality.IsAvatarRefreshing = true;
+        StatusMessage = $"Regeneration de l'avatar de {personality.Name}...";
+
+        try
+        {
+            var seed = BuildAvatarSeed(personality, forceFresh: true);
+            var avatarBase64 = await _diceBearAvatarService.GenerateAvatarPngBase64Async(seed, personality.Name);
+            personality.AvatarPngBase64 = avatarBase64;
+            _personalityService.UpdatePersonality(MapToEntry(personality));
+
+            if (_editingPersonality?.Id == personality.Id)
+            {
+                EditorAvatarPngBase64 = avatarBase64;
+            }
+
+            StatusMessage = $"Avatar de {personality.Name} regénéré.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Erreur : {ex.Message}";
+            MessageBox.Show(ex.Message, "Regeneration de l'avatar", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            personality.IsAvatarRefreshing = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     private void SelectImage()
@@ -748,6 +809,37 @@ Le resultat sera utilise tel quel comme instruction systeme lors d'une critique 
         StatusMessage = "Entrée supprimée.";
     }
 
+    private void DeletePersonality(PersonalityOption? personality)
+    {
+        if (personality is null)
+            return;
+
+        var confirm = MessageBox.Show(
+            $"Supprimer la personnalite '{personality.Name}' ?",
+            "Confirmation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        _personalityService.DeletePersonality(personality.Id);
+        Personalities.Remove(personality);
+
+        var critiquesToRemove = Critiques.Where(c => string.Equals(c.PersonalityName, personality.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var critique in critiquesToRemove)
+            Critiques.Remove(critique);
+
+        if (_editingPersonality?.Id == personality.Id)
+        {
+            _editingPersonality = null;
+            SetEditorDefaults();
+        }
+
+        UpdateSelectedPersonalitiesSummary();
+        StatusMessage = $"Personnalite supprimee : {personality.Name}";
+    }
+
     private void LoadHistory()
     {
         HistoryEntries.Clear();
@@ -792,9 +884,9 @@ Le resultat sera utilise tel quel comme instruction systeme lors d'une critique 
         var role = PersonalityEditorRole.Trim();
         var finalPersonality = PersonalityEditorFinal.Trim();
 
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(role))
+        if (string.IsNullOrWhiteSpace(name))
         {
-            MessageBox.Show("Le nom et la description sont obligatoires.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Le nom est obligatoire.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -887,6 +979,48 @@ Le resultat sera utilise tel quel comme instruction systeme lors d'une critique 
         EditorElderlyFlag = false;
         EditorLowMobilityFlag = false;
         EditorLowDigitalLiteracyFlag = false;
+    }
+
+    private string BuildEditorAvatarSeed(bool forceFresh)
+    {
+        var parts = new[]
+        {
+            PersonalityEditorName.Trim(),
+            PersonalityEditorRole.Trim(),
+            EditorCuriosity.ToString(),
+            EditorCompetence.ToString(),
+            EditorPracticality.ToString(),
+            EditorAestheticSensitivity.ToString(),
+            EditorRigor.ToString(),
+            EditorLimitedVisionFlag.ToString(),
+            EditorElderlyFlag.ToString(),
+            EditorLowMobilityFlag.ToString(),
+            EditorLowDigitalLiteracyFlag.ToString()
+        };
+
+        var seed = string.Join("|", parts);
+        return forceFresh ? $"{seed}|{Guid.NewGuid():N}" : seed;
+    }
+
+    private static string BuildAvatarSeed(PersonalityOption personality, bool forceFresh)
+    {
+        var parts = new[]
+        {
+            personality.Name.Trim(),
+            personality.RoleDescription.Trim(),
+            personality.Curiosity.ToString(),
+            personality.Competence.ToString(),
+            personality.Practicality.ToString(),
+            personality.AestheticSensitivity.ToString(),
+            personality.Rigor.ToString(),
+            personality.LimitedVisionFlag.ToString(),
+            personality.ElderlyFlag.ToString(),
+            personality.LowMobilityFlag.ToString(),
+            personality.LowDigitalLiteracyFlag.ToString()
+        };
+
+        var seed = string.Join("|", parts);
+        return forceFresh ? $"{seed}|{Guid.NewGuid():N}" : seed;
     }
 
     private void ApplyEditorValuesTo(PersonalityOption personality)

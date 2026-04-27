@@ -201,6 +201,17 @@ public class PersonalityRepository : IPersonalityRepository
         cmd.ExecuteNonQuery();
     }
 
+    public void Delete(int id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM Personalities WHERE Id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
     private static void Bind(PersonalityEntry entry, SqliteCommand cmd)
     {
         cmd.Parameters.AddWithValue("$name", entry.Name);

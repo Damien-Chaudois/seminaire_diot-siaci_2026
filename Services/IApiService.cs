@@ -3,6 +3,7 @@ namespace Services;
 public interface IApiService
 {
     bool HasApiKey { get; }
+    string CurrentApiKey { get; }
     string CurrentModel { get; }
     IReadOnlyList<string> GetAvailableModels();
     Task<string> SendImageAsync(string base64Image, string extension, string personalityInstruction);
