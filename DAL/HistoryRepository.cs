@@ -23,11 +23,24 @@ public class HistoryRepository : IHistoryRepository
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ImageBase64 TEXT NOT NULL,
                 ImageExtension TEXT NOT NULL DEFAULT 'jpeg',
+                SelectedPersonalitiesCsv TEXT NOT NULL DEFAULT '',
                 ResultText TEXT NOT NULL,
                 CreatedAt TEXT NOT NULL
             )
             """;
         cmd.ExecuteNonQuery();
+
+        // Migration for databases created before personalities were introduced.
+        var alterCmd = connection.CreateCommand();
+        alterCmd.CommandText = "ALTER TABLE History ADD COLUMN SelectedPersonalitiesCsv TEXT NOT NULL DEFAULT ''";
+        try
+        {
+            alterCmd.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists; no action needed.
+        }
     }
 
     public void Insert(HistoryEntry entry)
@@ -37,11 +50,12 @@ public class HistoryRepository : IHistoryRepository
 
         var cmd = connection.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO History (ImageBase64, ImageExtension, ResultText, CreatedAt)
-            VALUES ($imageBase64, $imageExtension, $resultText, $createdAt)
+            INSERT INTO History (ImageBase64, ImageExtension, SelectedPersonalitiesCsv, ResultText, CreatedAt)
+            VALUES ($imageBase64, $imageExtension, $selectedPersonalitiesCsv, $resultText, $createdAt)
             """;
         cmd.Parameters.AddWithValue("$imageBase64", entry.ImageBase64);
         cmd.Parameters.AddWithValue("$imageExtension", entry.ImageExtension);
+        cmd.Parameters.AddWithValue("$selectedPersonalitiesCsv", entry.SelectedPersonalitiesCsv);
         cmd.Parameters.AddWithValue("$resultText", entry.ResultText);
         cmd.Parameters.AddWithValue("$createdAt", entry.CreatedAt.ToString("o"));
         cmd.ExecuteNonQuery();
@@ -56,7 +70,7 @@ public class HistoryRepository : IHistoryRepository
         connection.Open();
 
         var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT Id, ImageBase64, ImageExtension, ResultText, CreatedAt FROM History ORDER BY CreatedAt DESC";
+        cmd.CommandText = "SELECT Id, ImageBase64, ImageExtension, SelectedPersonalitiesCsv, ResultText, CreatedAt FROM History ORDER BY CreatedAt DESC";
 
         var entries = new List<HistoryEntry>();
         using var reader = cmd.ExecuteReader();
@@ -67,8 +81,9 @@ public class HistoryRepository : IHistoryRepository
                 Id = reader.GetInt32(0),
                 ImageBase64 = reader.GetString(1),
                 ImageExtension = reader.GetString(2),
-                ResultText = reader.GetString(3),
-                CreatedAt = DateTime.Parse(reader.GetString(4))
+                SelectedPersonalitiesCsv = reader.GetString(3),
+                ResultText = reader.GetString(4),
+                CreatedAt = DateTime.Parse(reader.GetString(5))
             });
         }
         return entries;

@@ -11,8 +11,8 @@ public class LlmService : ILlmService
         _apiService = apiService;
     }
 
-    public Task<string> AnalyzeImageAsync(string base64Image, string extension, string prompt)
+    public Task<string> AnalyzeImageAsync(string base64Image, string extension, string personalityInstruction)
     {
-        return _apiService.SendImageAsync(base64Image, extension, prompt);
+        return _apiService.SendImageAsync(base64Image, extension, personalityInstruction);
     }
 }

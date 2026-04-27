@@ -16,13 +16,13 @@ public class ApiService : IApiService
     {
         _apiKey = EnvService.Get("GITHUB_PAT");
         _baseUrl = EnvService.Get("API_BASE_URL").TrimEnd('/');
-        _model = EnvService.Get("MODEL_NAME");
+        _model = NormalizeModelName(EnvService.Get("MODEL_NAME"));
 
         if (string.IsNullOrWhiteSpace(_model))
             _model = "gpt-4o";
     }
 
-    public async Task<string> SendImageAsync(string base64Image, string extension, string prompt)
+    public async Task<string> SendImageAsync(string base64Image, string extension, string personalityInstruction)
     {
         if (string.IsNullOrWhiteSpace(_apiKey))
             throw new InvalidOperationException("Clé API non configurée. Veuillez renseigner GITHUB_PAT dans le fichier .env.");
@@ -47,7 +47,7 @@ public class ApiService : IApiService
                         new
                         {
                             type = "text",
-                            text = string.IsNullOrWhiteSpace(prompt) ? "Décris cette image." : prompt
+                            text = personalityInstruction
                         }
                     }
                 }
@@ -64,7 +64,24 @@ public class ApiService : IApiService
         var responseBody = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
+        {
+            if ((int)response.StatusCode == 401 &&
+                responseBody.Contains("models' permission is required", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new HttpRequestException(
+                    "Token GitHub non autorisé pour GitHub Models. " +
+                    "Créez un PAT avec la permission 'Models' puis remplacez GITHUB_PAT dans .env.");
+            }
+
+            if ((int)response.StatusCode == 400 &&
+                responseBody.Contains("unknown_model", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new HttpRequestException(
+                    $"Modèle inconnu: '{_model}'. Vérifiez MODEL_NAME dans .env (exemple: gpt-4o).");
+            }
+
             throw new HttpRequestException($"Erreur API ({response.StatusCode}): {responseBody}");
+        }
 
         using var doc = JsonDocument.Parse(responseBody);
         var content = doc.RootElement
@@ -74,5 +91,19 @@ public class ApiService : IApiService
             .GetString();
 
         return content ?? string.Empty;
+    }
+
+    private static string NormalizeModelName(string value)
+    {
+        var normalized = value.Trim().Trim('"', '\'', '`');
+
+        // Common typos seen in .env values.
+        normalized = normalized.Replace("gpt-4.0", "gpt-4o", StringComparison.OrdinalIgnoreCase);
+        normalized = normalized.Replace("gpt4o", "gpt-4o", StringComparison.OrdinalIgnoreCase);
+
+        while (normalized.EndsWith("()", StringComparison.Ordinal))
+            normalized = normalized[..^2].Trim();
+
+        return normalized;
     }
 }

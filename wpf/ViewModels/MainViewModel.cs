@@ -5,8 +5,37 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using BLL;
 using DAL.Models;
+using System.Text;
 
 namespace wpf.ViewModels;
+
+public class PersonalityOption : ViewModelBase
+{
+    private bool _isSelected;
+
+    public string Name { get; }
+    public string PromptInstruction { get; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (SetProperty(ref _isSelected, value))
+            {
+                SelectionChanged?.Invoke();
+            }
+        }
+    }
+
+    public Action? SelectionChanged { get; set; }
+
+    public PersonalityOption(string name, string promptInstruction)
+    {
+        Name = name;
+        PromptInstruction = promptInstruction;
+    }
+}
 
 public class MainViewModel : ViewModelBase
 {
@@ -20,17 +49,19 @@ public class MainViewModel : ViewModelBase
     private BitmapImage? _previewImage;
     public BitmapImage? PreviewImage { get => _previewImage; set => SetProperty(ref _previewImage, value); }
 
-    // ── Prompt ───────────────────────────────────────────────────────────────
-    private string _prompt = "Décris cette image en détail.";
-    public string Prompt { get => _prompt; set => SetProperty(ref _prompt, value); }
+    // ── Personalities ─────────────────────────────────────────────────────────
+    public ObservableCollection<PersonalityOption> Personalities { get; } = [];
 
-    // ── Results (liste déroulante de blocs de texte) ─────────────────────────
-    public ObservableCollection<string> ResultBlocks { get; } = [];
-    private string? _selectedResultBlock;
-    public string? SelectedResultBlock { get => _selectedResultBlock; set => SetProperty(ref _selectedResultBlock, value); }
+    private string _selectedPersonalitiesSummary = "Aucune personnalité sélectionnée";
+    public string SelectedPersonalitiesSummary
+    {
+        get => _selectedPersonalitiesSummary;
+        set => SetProperty(ref _selectedPersonalitiesSummary, value);
+    }
 
-    private string _fullResultText = string.Empty;
-    public string FullResultText { get => _fullResultText; set => SetProperty(ref _fullResultText, value); }
+    // ── Result ────────────────────────────────────────────────────────────────
+    private string _resultText = string.Empty;
+    public string ResultText { get => _resultText; set => SetProperty(ref _resultText, value); }
 
     // ── History (liste de boutons) ────────────────────────────────────────────
     public ObservableCollection<HistoryEntry> HistoryEntries { get; } = [];
@@ -62,7 +93,38 @@ public class MainViewModel : ViewModelBase
         RestoreHistoryCommand = new RelayCommand(entry => RestoreHistory(entry as HistoryEntry));
         DeleteHistoryCommand = new RelayCommand(entry => DeleteHistory(entry as HistoryEntry));
 
+        InitializePersonalities();
         LoadHistory();
+    }
+
+    private void InitializePersonalities()
+    {
+        var defaults = new[]
+        {
+            new PersonalityOption("UX Coach", "Analyse l'intuitivite, la clarte des parcours et la comprehension immediate de l'interface."),
+            new PersonalityOption("Art Director", "Analyse la beaute visuelle, la coherence graphique, la hierarchie visuelle et l'impact esthetique."),
+            new PersonalityOption("Product Designer", "Analyse l'elegance des interactions, la structure des informations et la qualite des composants."),
+            new PersonalityOption("Power User", "Analyse la praticite, la vitesse d'execution des taches et l'efficacite operationnelle."),
+            new PersonalityOption("Accessibility Expert", "Analyse l'accessibilite : contrastes, lisibilite, taille des zones cliquables et inclusion."),
+            new PersonalityOption("Conversion Specialist", "Analyse la capacite de l'interface a guider vers les actions principales et a reduire les frictions.")
+        };
+
+        Personalities.Clear();
+        foreach (var item in defaults)
+        {
+            item.SelectionChanged = UpdateSelectedPersonalitiesSummary;
+            Personalities.Add(item);
+        }
+
+        UpdateSelectedPersonalitiesSummary();
+    }
+
+    private void UpdateSelectedPersonalitiesSummary()
+    {
+        var selected = Personalities.Where(p => p.IsSelected).Select(p => p.Name).ToArray();
+        SelectedPersonalitiesSummary = selected.Length == 0
+            ? "Aucune personnalité sélectionnée"
+            : string.Join(" | ", selected);
     }
 
     private void SelectImage()
@@ -92,31 +154,52 @@ public class MainViewModel : ViewModelBase
 
     private async Task SendToApiAsync()
     {
+        var selectedPersonalities = Personalities.Where(p => p.IsSelected).ToList();
+        if (selectedPersonalities.Count == 0)
+        {
+            MessageBox.Show("Selectionnez au moins une personnalite.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         IsLoading = true;
         StatusMessage = "Envoi à l'API en cours...";
-        ResultBlocks.Clear();
-        FullResultText = string.Empty;
+        ResultText = string.Empty;
 
         try
         {
-            var result = await _llmService.AnalyzeImageAsync(_currentBase64, _currentExtension, Prompt);
+            var builder = new StringBuilder();
+            foreach (var personality in selectedPersonalities)
+            {
+                StatusMessage = $"Analyse en cours : {personality.Name}...";
 
-            FullResultText = result;
+                var personalityPrompt =
+                    $"Tu dois adopter strictement la personnalite suivante : {personality.Name}. " +
+                    $"{personality.PromptInstruction} " +
+                    "Analyse uniquement l'interface visible sur l'image. " +
+                    "Fais une critique concrete et actionnable en sections : Points forts, Points faibles, Recommandations prioritaires.";
 
-            // Découper en blocs par paragraphe pour la liste déroulante
-            var blocks = result.Split(["\n\n", "\r\n\r\n"], StringSplitOptions.RemoveEmptyEntries);
-            foreach (var block in blocks)
-                ResultBlocks.Add(block.Trim());
+                var critique = await _llmService.AnalyzeImageAsync(_currentBase64, _currentExtension, personalityPrompt);
 
-            if (ResultBlocks.Count > 0)
-                SelectedResultBlock = ResultBlocks[0];
+                if (builder.Length > 0)
+                {
+                    builder.AppendLine();
+                    builder.AppendLine();
+                }
+
+                builder.AppendLine($"=== {personality.Name} ===");
+                builder.AppendLine(critique.Trim());
+            }
+
+            var combinedResult = builder.ToString().Trim();
+            ResultText = combinedResult;
 
             // Sauvegarder dans l'historique
             var entry = new HistoryEntry
             {
                 ImageBase64 = _currentBase64,
                 ImageExtension = _currentExtension,
-                ResultText = result,
+                SelectedPersonalitiesCsv = string.Join(";", selectedPersonalities.Select(p => p.Name)),
+                ResultText = combinedResult,
                 CreatedAt = DateTime.Now
             };
             _historyService.SaveEntry(entry);
@@ -144,14 +227,18 @@ public class MainViewModel : ViewModelBase
         PreviewImage = LoadBitmapFromBase64(entry.ImageBase64);
         HasImage = true;
 
-        FullResultText = entry.ResultText;
-        ResultBlocks.Clear();
-        var blocks = entry.ResultText.Split(["\n\n", "\r\n\r\n"], StringSplitOptions.RemoveEmptyEntries);
-        foreach (var block in blocks)
-            ResultBlocks.Add(block.Trim());
+        ResultText = entry.ResultText;
 
-        if (ResultBlocks.Count > 0)
-            SelectedResultBlock = ResultBlocks[0];
+        var selectedSet = entry.SelectedPersonalitiesCsv
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var personality in Personalities)
+        {
+            personality.IsSelected = selectedSet.Contains(personality.Name);
+        }
+
+        UpdateSelectedPersonalitiesSummary();
 
         StatusMessage = $"Historique restauré : {entry.CreatedAt:dd/MM/yyyy HH:mm}";
     }
