@@ -70,7 +70,7 @@ public class HistoryRepository : IHistoryRepository
         connection.Open();
 
         var cmd = connection.CreateCommand();
-        cmd.CommandText = "SELECT Id, ImageBase64, ImageExtension, SelectedPersonalitiesCsv, ResultText, CreatedAt FROM History ORDER BY CreatedAt DESC";
+        cmd.CommandText = "SELECT Id, ImageBase64, ImageExtension, SelectedPersonalitiesCsv, ResultText, CreatedAt FROM History ORDER BY CreatedAt ASC";
 
         var entries = new List<HistoryEntry>();
         using var reader = cmd.ExecuteReader();

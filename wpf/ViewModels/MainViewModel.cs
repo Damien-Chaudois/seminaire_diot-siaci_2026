@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using BLL;
 using DAL.Models;
@@ -12,9 +14,20 @@ namespace wpf.ViewModels;
 public class PersonalityOption : ViewModelBase
 {
     private bool _isSelected;
+    private string _name;
+    private string _promptInstruction;
 
-    public string Name { get; }
-    public string PromptInstruction { get; }
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    public string PromptInstruction
+    {
+        get => _promptInstruction;
+        set => SetProperty(ref _promptInstruction, value);
+    }
 
     public bool IsSelected
     {
@@ -32,8 +45,28 @@ public class PersonalityOption : ViewModelBase
 
     public PersonalityOption(string name, string promptInstruction)
     {
-        Name = name;
-        PromptInstruction = promptInstruction;
+        _name = name;
+        _promptInstruction = promptInstruction;
+    }
+}
+
+public class PersonalityCritique : ViewModelBase
+{
+    private bool _isExpanded;
+
+    public string PersonalityName { get; }
+    public string CritiqueText { get; }
+
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
+    }
+
+    public PersonalityCritique(string personalityName, string critiqueText)
+    {
+        PersonalityName = personalityName;
+        CritiqueText = critiqueText;
     }
 }
 
@@ -60,8 +93,7 @@ public class MainViewModel : ViewModelBase
     }
 
     // ── Result ────────────────────────────────────────────────────────────────
-    private string _resultText = string.Empty;
-    public string ResultText { get => _resultText; set => SetProperty(ref _resultText, value); }
+    public ObservableCollection<PersonalityCritique> Critiques { get; } = [];
 
     // ── History (liste de boutons) ────────────────────────────────────────────
     public ObservableCollection<HistoryEntry> HistoryEntries { get; } = [];
@@ -81,6 +113,8 @@ public class MainViewModel : ViewModelBase
     public ICommand SendToApiCommand { get; }
     public ICommand RestoreHistoryCommand { get; }
     public ICommand DeleteHistoryCommand { get; }
+    public ICommand EditPersonalityCommand { get; }
+    public ICommand AddPersonalityCommand { get; }
 
     public MainViewModel(IImageService imageService, ILlmService llmService, IHistoryService historyService)
     {
@@ -92,6 +126,8 @@ public class MainViewModel : ViewModelBase
         SendToApiCommand = new RelayCommandAsync(_ => SendToApiAsync(), _ => HasImage && !IsLoading);
         RestoreHistoryCommand = new RelayCommand(entry => RestoreHistory(entry as HistoryEntry));
         DeleteHistoryCommand = new RelayCommand(entry => DeleteHistory(entry as HistoryEntry));
+        EditPersonalityCommand = new RelayCommand(entry => EditPersonality(entry as PersonalityOption));
+        AddPersonalityCommand = new RelayCommand(_ => AddPersonality());
 
         InitializePersonalities();
         LoadHistory();
@@ -163,11 +199,11 @@ public class MainViewModel : ViewModelBase
 
         IsLoading = true;
         StatusMessage = "Envoi à l'API en cours...";
-        ResultText = string.Empty;
+        Critiques.Clear();
 
         try
         {
-            var builder = new StringBuilder();
+            var critiques = new List<PersonalityCritique>();
             foreach (var personality in selectedPersonalities)
             {
                 StatusMessage = $"Analyse en cours : {personality.Name}...";
@@ -180,18 +216,16 @@ public class MainViewModel : ViewModelBase
 
                 var critique = await _llmService.AnalyzeImageAsync(_currentBase64, _currentExtension, personalityPrompt);
 
-                if (builder.Length > 0)
+                critiques.Add(new PersonalityCritique(personality.Name, critique.Trim())
                 {
-                    builder.AppendLine();
-                    builder.AppendLine();
-                }
-
-                builder.AppendLine($"=== {personality.Name} ===");
-                builder.AppendLine(critique.Trim());
+                    IsExpanded = false
+                });
             }
 
-            var combinedResult = builder.ToString().Trim();
-            ResultText = combinedResult;
+            foreach (var critique in critiques)
+                Critiques.Add(critique);
+
+            var combinedResult = SerializeCritiques(critiques);
 
             // Sauvegarder dans l'historique
             var entry = new HistoryEntry
@@ -203,7 +237,7 @@ public class MainViewModel : ViewModelBase
                 CreatedAt = DateTime.Now
             };
             _historyService.SaveEntry(entry);
-            HistoryEntries.Insert(0, entry);
+            HistoryEntries.Add(entry);
 
             StatusMessage = "Analyse terminée.";
         }
@@ -227,7 +261,9 @@ public class MainViewModel : ViewModelBase
         PreviewImage = LoadBitmapFromBase64(entry.ImageBase64);
         HasImage = true;
 
-        ResultText = entry.ResultText;
+        Critiques.Clear();
+        foreach (var critique in ParseCritiques(entry.ResultText))
+            Critiques.Add(critique);
 
         var selectedSet = entry.SelectedPersonalitiesCsv
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -263,6 +299,185 @@ public class MainViewModel : ViewModelBase
         HistoryEntries.Clear();
         foreach (var entry in _historyService.GetHistory())
             HistoryEntries.Add(entry);
+    }
+
+    private void AddPersonality()
+    {
+        var name = PromptForText("Nouvelle personnalite", "Nom de la personnalite :", string.Empty, false);
+        if (name is null)
+            return;
+
+        var sanitizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(sanitizedName))
+        {
+            MessageBox.Show("Le nom est obligatoire.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (Personalities.Any(p => string.Equals(p.Name, sanitizedName, StringComparison.OrdinalIgnoreCase)))
+        {
+            MessageBox.Show("Une personnalite avec ce nom existe deja.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var prompt = PromptForText("Prompt de personnalite", "Prompt de role :", string.Empty, true);
+        if (prompt is null)
+            return;
+
+        var item = new PersonalityOption(sanitizedName, prompt.Trim()) { SelectionChanged = UpdateSelectedPersonalitiesSummary };
+        Personalities.Add(item);
+        item.IsSelected = true;
+        StatusMessage = $"Personnalite ajoutee : {item.Name}";
+    }
+
+    private void EditPersonality(PersonalityOption? personality)
+    {
+        if (personality is null)
+            return;
+
+        var updatedPrompt = PromptForText(
+            $"Editer {personality.Name}",
+            "Prompt de role :",
+            personality.PromptInstruction,
+            true);
+
+        if (updatedPrompt is null)
+            return;
+
+        personality.PromptInstruction = updatedPrompt.Trim();
+        StatusMessage = $"Prompt mis a jour : {personality.Name}";
+    }
+
+    private static string? PromptForText(string title, string label, string initialText, bool multiline)
+    {
+        var window = new Window
+        {
+            Title = title,
+            Width = multiline ? 640 : 520,
+            Height = multiline ? 420 : 220,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new SolidColorBrush(Color.FromRgb(0x1B, 0x1C, 0x24)),
+            Foreground = Brushes.White
+        };
+
+        if (Application.Current?.MainWindow is not null)
+            window.Owner = Application.Current.MainWindow;
+
+        var grid = new Grid { Margin = new Thickness(14) };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var textLabel = new TextBlock
+        {
+            Text = label,
+            Margin = new Thickness(0, 0, 0, 8),
+            Foreground = new SolidColorBrush(Color.FromRgb(0xB3, 0xBC, 0xD3))
+        };
+        Grid.SetRow(textLabel, 0);
+        grid.Children.Add(textLabel);
+
+        var editor = new TextBox
+        {
+            Text = initialText,
+            AcceptsReturn = multiline,
+            TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
+            VerticalScrollBarVisibility = multiline ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled,
+            Background = new SolidColorBrush(Color.FromRgb(0x31, 0x38, 0x4B)),
+            Foreground = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x4F, 0x69)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8),
+            MinHeight = multiline ? 260 : 34
+        };
+        Grid.SetRow(editor, 1);
+        grid.Children.Add(editor);
+
+        var buttonRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+
+        var cancelButton = new Button
+        {
+            Content = "Annuler",
+            MinWidth = 90,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        cancelButton.Click += (_, _) => window.DialogResult = false;
+
+        var saveButton = new Button
+        {
+            Content = "Valider",
+            MinWidth = 90
+        };
+        saveButton.Click += (_, _) => window.DialogResult = true;
+
+        buttonRow.Children.Add(cancelButton);
+        buttonRow.Children.Add(saveButton);
+        Grid.SetRow(buttonRow, 2);
+        grid.Children.Add(buttonRow);
+
+        window.Content = grid;
+
+        var result = window.ShowDialog();
+        return result == true ? editor.Text : null;
+    }
+
+    private static string SerializeCritiques(IEnumerable<PersonalityCritique> critiques)
+    {
+        var builder = new StringBuilder();
+        foreach (var critique in critiques)
+        {
+            if (builder.Length > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine();
+            }
+
+            builder.AppendLine($"=== {critique.PersonalityName} ===");
+            builder.AppendLine(critique.CritiqueText.Trim());
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private static IEnumerable<PersonalityCritique> ParseCritiques(string raw)
+    {
+        var result = new List<PersonalityCritique>();
+        var normalized = raw.Replace("\r", string.Empty);
+        var lines = normalized.Split('\n');
+
+        string? currentName = null;
+        var currentText = new StringBuilder();
+
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("=== ") && line.EndsWith(" ===") && line.Length > 8)
+            {
+                if (!string.IsNullOrWhiteSpace(currentName))
+                {
+                    result.Add(new PersonalityCritique(currentName, currentText.ToString().Trim()) { IsExpanded = false });
+                    currentText.Clear();
+                }
+
+                currentName = line[4..^4].Trim();
+                continue;
+            }
+
+            currentText.AppendLine(line);
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentName))
+            result.Add(new PersonalityCritique(currentName, currentText.ToString().Trim()) { IsExpanded = false });
+
+        if (result.Count == 0 && !string.IsNullOrWhiteSpace(raw))
+            result.Add(new PersonalityCritique("Critique", raw.Trim()) { IsExpanded = false });
+
+        return result;
     }
 
     private static BitmapImage LoadBitmapFromFile(string path)
