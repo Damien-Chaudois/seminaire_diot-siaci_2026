@@ -1,0 +1,10 @@
+<Window x:Class="SeminaireDiotSciaci2026.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SeminaireDiotSciaci2026"
+        Width="960"
+        Height="600"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+    </Grid>
+</Window>
