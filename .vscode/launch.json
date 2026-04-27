@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "WPF: dotnet run",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "dotnet run --project \"${workspaceFolder}/wpf/wpf.csproj\""
+    }
+  ]
+}
