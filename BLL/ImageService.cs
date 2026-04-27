@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace wpf.BLL;
+namespace BLL;
 
 public class ImageService : IImageService
 {

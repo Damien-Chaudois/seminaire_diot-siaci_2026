@@ -1,4 +1,4 @@
-namespace wpf.BLL;
+namespace BLL;
 
 public interface ILlmService
 {

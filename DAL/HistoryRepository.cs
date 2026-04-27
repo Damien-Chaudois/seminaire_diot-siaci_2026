@@ -1,7 +1,7 @@
 using Microsoft.Data.Sqlite;
-using wpf.Models;
+using DAL.Models;
 
-namespace wpf.DAL;
+namespace DAL;
 
 public class HistoryRepository : IHistoryRepository
 {

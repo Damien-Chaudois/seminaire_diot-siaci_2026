@@ -1,4 +1,4 @@
-namespace wpf.Models;
+namespace DAL.Models;
 
 public class HistoryEntry
 {

@@ -1,6 +1,6 @@
-using wpf.Models;
+using DAL.Models;
 
-namespace wpf.DAL;
+namespace DAL;
 
 public interface IHistoryRepository
 {

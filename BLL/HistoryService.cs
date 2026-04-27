@@ -1,7 +1,7 @@
-using wpf.DAL;
-using wpf.Models;
+using DAL;
+using DAL.Models;
 
-namespace wpf.BLL;
+namespace BLL;
 
 public interface IHistoryService
 {

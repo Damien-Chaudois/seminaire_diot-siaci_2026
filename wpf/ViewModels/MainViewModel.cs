@@ -3,8 +3,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using wpf.BLL;
-using wpf.Models;
+using BLL;
+using DAL.Models;
 
 namespace wpf.ViewModels;
 

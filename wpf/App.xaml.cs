@@ -1,8 +1,8 @@
 ﻿using System.IO;
 using System.Windows;
-using wpf.BLL;
-using wpf.DAL;
-using wpf.Services;
+using BLL;
+using DAL;
+using Services;
 using wpf.ViewModels;
 
 namespace wpf;

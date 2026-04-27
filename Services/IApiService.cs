@@ -1,4 +1,4 @@
-namespace wpf.Services;
+namespace Services;
 
 public interface IApiService
 {

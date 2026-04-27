@@ -1,6 +1,6 @@
-using wpf.Services;
+using Services;
 
-namespace wpf.BLL;
+namespace BLL;
 
 public class LlmService : ILlmService
 {

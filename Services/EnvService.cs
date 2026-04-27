@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace wpf.Services;
+namespace Services;
 
 /// <summary>Reads key=value pairs from a .env file.</summary>
 public static class EnvService
