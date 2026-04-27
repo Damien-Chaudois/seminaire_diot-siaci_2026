@@ -12,9 +12,13 @@ namespace wpf.ViewModels;
 
 public class PersonalityOption : ViewModelBase
 {
+    private int _id;
     private bool _isSelected;
     private string _name;
     private string _roleDescription;
+    private string _finalPersonality;
+    private string _avatarPngBase64;
+    private BitmapImage? _avatarImage;
     private int _curiosity;
     private int _competence;
     private int _practicality;
@@ -24,6 +28,12 @@ public class PersonalityOption : ViewModelBase
     private bool _elderlyFlag;
     private bool _lowMobilityFlag;
     private bool _lowDigitalLiteracyFlag;
+
+    public int Id
+    {
+        get => _id;
+        set => SetProperty(ref _id, value);
+    }
 
     public string Name
     {
@@ -35,6 +45,30 @@ public class PersonalityOption : ViewModelBase
     {
         get => _roleDescription;
         set => SetProperty(ref _roleDescription, value);
+    }
+
+    public string FinalPersonality
+    {
+        get => _finalPersonality;
+        set => SetProperty(ref _finalPersonality, value);
+    }
+
+    public string AvatarPngBase64
+    {
+        get => _avatarPngBase64;
+        set
+        {
+            if (!SetProperty(ref _avatarPngBase64, value))
+                return;
+
+            AvatarImage = TryCreateBitmap(value);
+        }
+    }
+
+    public BitmapImage? AvatarImage
+    {
+        get => _avatarImage;
+        private set => SetProperty(ref _avatarImage, value);
     }
 
     public int Curiosity
@@ -109,10 +143,21 @@ public class PersonalityOption : ViewModelBase
     {
         _name = name;
         _roleDescription = roleDescription;
+        _finalPersonality = string.Empty;
+        _avatarPngBase64 = string.Empty;
     }
 
     public string BuildSystemPrompt()
     {
+        if (!string.IsNullOrWhiteSpace(FinalPersonality))
+        {
+            return
+                FinalPersonality.Trim() + " " +
+                "Analyse uniquement l'interface visible sur l'image fournie par l'utilisateur. " +
+                "Commence ta réponse par une ligne au format exact : NOTE: x/5 (avec x un entier entre 0 et 5). " +
+                "Puis fournis une critique concrète et actionnable structurée en trois sections : Points forts, Points faibles, Recommandations prioritaires.";
+        }
+
         var flags = new List<string>();
         if (LimitedVisionFlag) flags.Add("vision limitée");
         if (ElderlyFlag) flags.Add("personne âgée");
@@ -144,11 +189,34 @@ public class PersonalityOption : ViewModelBase
             "Reste dans ce personnage tout au long de ta réponse : ton ton, tes priorités et ta façon d'évaluer doivent refléter fidèlement cette personnalité. " +
             "Analyse uniquement l'interface visible sur l'image fournie par l'utilisateur. " +
             "Commence ta réponse par une ligne au format exact : NOTE: x/5 (avec x un entier entre 0 et 5). " +
-            "Puis fournis une critique concrète et actionnnable structurée en trois sections : Points forts, Points faibles, Recommandations prioritaires.";
+            "Puis fournis une critique concrète et actionnable structurée en trois sections : Points forts, Points faibles, Recommandations prioritaires.";
     }
 
     [System.Obsolete("Use BuildSystemPrompt() instead.")]
     public string BuildInstruction() => BuildSystemPrompt();
+
+    private static BitmapImage? TryCreateBitmap(string base64)
+    {
+        if (string.IsNullOrWhiteSpace(base64))
+            return null;
+
+        try
+        {
+            var bytes = Convert.FromBase64String(base64);
+            var bitmap = new BitmapImage();
+            using var stream = new System.IO.MemoryStream(bytes);
+            bitmap.BeginInit();
+            bitmap.StreamSource = stream;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
 
 public class PersonalityCritique : ViewModelBase
@@ -179,7 +247,9 @@ public class MainViewModel : ViewModelBase
     private readonly IImageService _imageService;
     private readonly ILlmService _llmService;
     private readonly IHistoryService _historyService;
+    private readonly IPersonalityService _personalityService;
     private readonly Services.IApiService _apiService;
+    private readonly Services.IDiceBearAvatarService _diceBearAvatarService;
     private PersonalityOption? _editingPersonality;
 
     // ── Image ────────────────────────────────────────────────────────────────
@@ -202,6 +272,25 @@ public class MainViewModel : ViewModelBase
 
     private string _personalityEditorRole = string.Empty;
     public string PersonalityEditorRole { get => _personalityEditorRole; set => SetProperty(ref _personalityEditorRole, value); }
+
+    private string _personalityEditorFinal = string.Empty;
+    public string PersonalityEditorFinal { get => _personalityEditorFinal; set => SetProperty(ref _personalityEditorFinal, value); }
+
+    private string _editorAvatarPngBase64 = string.Empty;
+    public string EditorAvatarPngBase64
+    {
+        get => _editorAvatarPngBase64;
+        set
+        {
+            if (!SetProperty(ref _editorAvatarPngBase64, value))
+                return;
+
+            EditorAvatarImage = TryLoadBitmapFromBase64(value);
+        }
+    }
+
+    private BitmapImage? _editorAvatarImage;
+    public BitmapImage? EditorAvatarImage { get => _editorAvatarImage; set => SetProperty(ref _editorAvatarImage, value); }
 
     private int _editorCuriosity = 60;
     public int EditorCuriosity { get => _editorCuriosity; set => SetProperty(ref _editorCuriosity, value); }
@@ -292,15 +381,24 @@ public class MainViewModel : ViewModelBase
     public ICommand AddPersonalityCommand { get; }
     public ICommand SavePersonalityCommand { get; }
     public ICommand CancelPersonalityCommand { get; }
+    public ICommand GeneratePersonalityCommand { get; }
     public ICommand ResetCommand { get; }
     public ICommand ValidateApiKeyCommand { get; }
 
-    public MainViewModel(IImageService imageService, ILlmService llmService, IHistoryService historyService, Services.IApiService apiService)
+    public MainViewModel(
+        IImageService imageService,
+        ILlmService llmService,
+        IHistoryService historyService,
+        IPersonalityService personalityService,
+        Services.IApiService apiService,
+        Services.IDiceBearAvatarService diceBearAvatarService)
     {
         _imageService = imageService;
         _llmService = llmService;
         _historyService = historyService;
+        _personalityService = personalityService;
         _apiService = apiService;
+        _diceBearAvatarService = diceBearAvatarService;
 
         SelectImageCommand = new RelayCommand(_ => SelectImage());
         SendToApiCommand = new RelayCommandAsync(_ => SendToApiAsync(), _ => HasImage && !IsLoading && !string.IsNullOrWhiteSpace(SelectedModel));
@@ -310,6 +408,7 @@ public class MainViewModel : ViewModelBase
         AddPersonalityCommand = new RelayCommand(_ => OpenCreatePersonalityEditor());
         SavePersonalityCommand = new RelayCommand(_ => SavePersonality());
         CancelPersonalityCommand = new RelayCommand(_ => CancelPersonalityEdit());
+        GeneratePersonalityCommand = new RelayCommandAsync(_ => GeneratePersonalityAsync(), _ => !IsLoading && !string.IsNullOrWhiteSpace(PersonalityEditorRole) && !string.IsNullOrWhiteSpace(SelectedModel));
         ResetCommand = new RelayCommand(_ => ResetInterface());
         ValidateApiKeyCommand = new RelayCommandAsync(_ => ValidateApiKeyAsync(), _ => !string.IsNullOrWhiteSpace(ApiKeyInput));
 
@@ -361,38 +460,77 @@ public class MainViewModel : ViewModelBase
 
     private void InitializePersonalities()
     {
-        var defaults = new[]
+        var persisted = _personalityService.GetPersonalities().ToList();
+        if (persisted.Count == 0)
         {
-            new PersonalityOption("Camille", "UX Coach: analyse l'intuitivite, la clarte des parcours et la comprehension immediate.")
-            {
-                Curiosity = 70, Competence = 85, Practicality = 90, AestheticSensitivity = 55, Rigor = 80
-            },
-            new PersonalityOption("Leo", "Art Director: analyse la beaute visuelle, la coherence graphique et l'impact esthetique.")
-            {
-                Curiosity = 65, Competence = 88, Practicality = 45, AestheticSensitivity = 95, Rigor = 72
-            },
-            new PersonalityOption("Nora", "Accessibility Expert: analyse lisibilite, contrastes, tailles cliquables et inclusion.")
-            {
-                Curiosity = 75, Competence = 92, Practicality = 82, AestheticSensitivity = 58, Rigor = 96,
-                LimitedVisionFlag = true, ElderlyFlag = true
-            },
-            new PersonalityOption("Yanis", "Power User: analyse vitesse d'execution des taches et efficacite operationnelle.")
-            {
-                Curiosity = 55, Competence = 80, Practicality = 96, AestheticSensitivity = 40, Rigor = 78
-            }
-        };
+            SeedDefaultPersonalities();
+            persisted = _personalityService.GetPersonalities().ToList();
+        }
 
         Personalities.Clear();
-        foreach (var item in defaults)
-        {
-            item.SelectionChanged = UpdateSelectedPersonalitiesSummary;
+        foreach (var item in persisted.Select(MapFromEntry))
             Personalities.Add(item);
-        }
 
         SetEditorDefaults();
         SelectedTabIndex = 0;
 
         UpdateSelectedPersonalitiesSummary();
+    }
+
+    private void SeedDefaultPersonalities()
+    {
+        var defaults = new[]
+        {
+            new PersonalityEntry
+            {
+                Name = "Camille",
+                Description = "UX Coach: analyse l'intuitivite, la clarte des parcours et la comprehension immediate.",
+                FinalPersonality = "Tu es Camille, UX Coach orientee clarte, fluidite et comprehension immediate des interfaces.",
+                Curiosity = 70,
+                Competence = 85,
+                Practicality = 90,
+                AestheticSensitivity = 55,
+                Rigor = 80
+            },
+            new PersonalityEntry
+            {
+                Name = "Leo",
+                Description = "Art Director: analyse la beaute visuelle, la coherence graphique et l'impact esthetique.",
+                FinalPersonality = "Tu es Leo, Art Director centre sur la coherence visuelle, la hierarchie graphique et l'impact esthetique.",
+                Curiosity = 65,
+                Competence = 88,
+                Practicality = 45,
+                AestheticSensitivity = 95,
+                Rigor = 72
+            },
+            new PersonalityEntry
+            {
+                Name = "Nora",
+                Description = "Accessibility Expert: analyse lisibilite, contrastes, tailles cliquables et inclusion.",
+                FinalPersonality = "Tu es Nora, experte accessibilite; tu privilegies lisibilite, inclusion, contraste et robustesse des interactions.",
+                Curiosity = 75,
+                Competence = 92,
+                Practicality = 82,
+                AestheticSensitivity = 58,
+                Rigor = 96,
+                LimitedVisionFlag = true,
+                ElderlyFlag = true
+            },
+            new PersonalityEntry
+            {
+                Name = "Yanis",
+                Description = "Power User: analyse vitesse d'execution des taches et efficacite operationnelle.",
+                FinalPersonality = "Tu es Yanis, power user qui optimise la vitesse, la precision des actions et la reduction des frictions.",
+                Curiosity = 55,
+                Competence = 80,
+                Practicality = 96,
+                AestheticSensitivity = 40,
+                Rigor = 78
+            }
+        };
+
+        foreach (var item in defaults)
+            _personalityService.CreatePersonality(item);
     }
 
     private void UpdateSelectedPersonalitiesSummary()
@@ -401,6 +539,77 @@ public class MainViewModel : ViewModelBase
         SelectedPersonalitiesSummary = selected.Length == 0
             ? "Aucune personnalité sélectionnée"
             : string.Join(" | ", selected);
+    }
+
+    private async Task GeneratePersonalityAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedModel))
+        {
+            MessageBox.Show("Selectionnez un modele IA avant de generer une personnalite.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var description = PersonalityEditorRole.Trim();
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            MessageBox.Show("Renseignez une description avant de generer.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Generation IA de la personnalite en cours...";
+
+        try
+        {
+            var prompt = BuildPersonalityGenerationPrompt(description);
+            PersonalityEditorFinal = (await _llmService.GenerateTesterPersonalityAsync(prompt)).Trim();
+
+            var seed = $"{PersonalityEditorName.Trim()}|{description}|{EditorCuriosity}-{EditorCompetence}-{EditorPracticality}-{EditorAestheticSensitivity}-{EditorRigor}";
+            EditorAvatarPngBase64 = await _diceBearAvatarService.GenerateAvatarPngBase64Async(seed);
+
+            StatusMessage = "Personnalite finale et avatar DiceBear generes.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Erreur : {ex.Message}";
+            MessageBox.Show(ex.Message, "Generation de personnalite", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private string BuildPersonalityGenerationPrompt(string description)
+    {
+        var constraints = new List<string>();
+        if (EditorLimitedVisionFlag) constraints.Add("vision limitee");
+        if (EditorElderlyFlag) constraints.Add("personne agee");
+        if (EditorLowMobilityFlag) constraints.Add("motricite reduite");
+        if (EditorLowDigitalLiteracyFlag) constraints.Add("faible aisance numerique");
+
+        var constraintsText = constraints.Count == 0 ? "aucune" : string.Join(", ", constraints);
+        var personalityName = string.IsNullOrWhiteSpace(PersonalityEditorName) ? "ce testeur" : PersonalityEditorName.Trim();
+
+        return $"""
+Tu dois generer une personnalite de testeur UX/UI nommee {personalityName}.
+
+Description de base:
+{description}
+
+Traits (0 a 100):
+- curiosite: {EditorCuriosity}
+- competence technique: {EditorCompetence}
+- praticite: {EditorPracticality}
+- sensibilite esthetique: {EditorAestheticSensitivity}
+- rigueur: {EditorRigor}
+
+Contraintes utilisateur simulees: {constraintsText}
+
+Ecris en francais, en 1 bloc de texte concis (max 180 mots), sans markdown, sans liste, sans titre.
+Le texte doit decrire: ton, priorites, methode de test, type de critique, format de sortie exige avec NOTE /5 et recommandations prioritaires.
+Le resultat sera utilise tel quel comme instruction systeme lors d'une critique d'interface.
+""";
     }
 
     private void SelectImage()
@@ -563,6 +772,8 @@ public class MainViewModel : ViewModelBase
         PersonalityFormTitle = $"Edition de {personality.Name}";
         PersonalityEditorName = personality.Name;
         PersonalityEditorRole = personality.RoleDescription;
+        PersonalityEditorFinal = personality.FinalPersonality;
+        EditorAvatarPngBase64 = personality.AvatarPngBase64;
         EditorCuriosity = personality.Curiosity;
         EditorCompetence = personality.Competence;
         EditorPracticality = personality.Practicality;
@@ -579,10 +790,17 @@ public class MainViewModel : ViewModelBase
     {
         var name = PersonalityEditorName.Trim();
         var role = PersonalityEditorRole.Trim();
+        var finalPersonality = PersonalityEditorFinal.Trim();
 
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(role))
         {
-            MessageBox.Show("Le nom et le role sont obligatoires.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Le nom et la description sont obligatoires.", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(finalPersonality))
+        {
+            MessageBox.Show("Le champ 'personnalite finale' est obligatoire (manuel ou via Generer IA).", "Validation", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -607,6 +825,12 @@ public class MainViewModel : ViewModelBase
                 SelectionChanged = UpdateSelectedPersonalitiesSummary
             };
             ApplyEditorValuesTo(created);
+            created.FinalPersonality = finalPersonality;
+            created.AvatarPngBase64 = EditorAvatarPngBase64;
+
+            var createdEntry = _personalityService.CreatePersonality(MapToEntry(created));
+            created.Id = createdEntry.Id;
+
             Personalities.Add(created);
             created.IsSelected = true;
             StatusMessage = $"Personnalite ajoutee : {created.Name}";
@@ -615,7 +839,11 @@ public class MainViewModel : ViewModelBase
         {
             _editingPersonality.Name = name;
             _editingPersonality.RoleDescription = role;
+            _editingPersonality.FinalPersonality = finalPersonality;
+            _editingPersonality.AvatarPngBase64 = EditorAvatarPngBase64;
             ApplyEditorValuesTo(_editingPersonality);
+
+            _personalityService.UpdatePersonality(MapToEntry(_editingPersonality));
             StatusMessage = $"Personnalite mise a jour : {_editingPersonality.Name}";
         }
 
@@ -647,6 +875,9 @@ public class MainViewModel : ViewModelBase
     {
         PersonalityEditorName = string.Empty;
         PersonalityEditorRole = string.Empty;
+        PersonalityEditorFinal = string.Empty;
+        EditorAvatarPngBase64 = string.Empty;
+        EditorAvatarImage = null;
         EditorCuriosity = 60;
         EditorCompetence = 60;
         EditorPracticality = 60;
@@ -669,6 +900,49 @@ public class MainViewModel : ViewModelBase
         personality.ElderlyFlag = EditorElderlyFlag;
         personality.LowMobilityFlag = EditorLowMobilityFlag;
         personality.LowDigitalLiteracyFlag = EditorLowDigitalLiteracyFlag;
+    }
+
+    private PersonalityOption MapFromEntry(PersonalityEntry entry)
+    {
+        var personality = new PersonalityOption(entry.Name, entry.Description)
+        {
+            Id = entry.Id,
+            FinalPersonality = entry.FinalPersonality,
+            AvatarPngBase64 = entry.AvatarPngBase64,
+            Curiosity = entry.Curiosity,
+            Competence = entry.Competence,
+            Practicality = entry.Practicality,
+            AestheticSensitivity = entry.AestheticSensitivity,
+            Rigor = entry.Rigor,
+            LimitedVisionFlag = entry.LimitedVisionFlag,
+            ElderlyFlag = entry.ElderlyFlag,
+            LowMobilityFlag = entry.LowMobilityFlag,
+            LowDigitalLiteracyFlag = entry.LowDigitalLiteracyFlag,
+            SelectionChanged = UpdateSelectedPersonalitiesSummary
+        };
+
+        return personality;
+    }
+
+    private PersonalityEntry MapToEntry(PersonalityOption option)
+    {
+        return new PersonalityEntry
+        {
+            Id = option.Id,
+            Name = option.Name,
+            Description = option.RoleDescription,
+            FinalPersonality = option.FinalPersonality,
+            AvatarPngBase64 = option.AvatarPngBase64,
+            Curiosity = option.Curiosity,
+            Competence = option.Competence,
+            Practicality = option.Practicality,
+            AestheticSensitivity = option.AestheticSensitivity,
+            Rigor = option.Rigor,
+            LimitedVisionFlag = option.LimitedVisionFlag,
+            ElderlyFlag = option.ElderlyFlag,
+            LowMobilityFlag = option.LowMobilityFlag,
+            LowDigitalLiteracyFlag = option.LowDigitalLiteracyFlag
+        };
     }
 
     private static string SerializeCritiques(IEnumerable<PersonalityCritique> critiques)
@@ -774,5 +1048,20 @@ public class MainViewModel : ViewModelBase
         bitmap.EndInit();
         bitmap.Freeze();
         return bitmap;
+    }
+
+    private static BitmapImage? TryLoadBitmapFromBase64(string base64)
+    {
+        if (string.IsNullOrWhiteSpace(base64))
+            return null;
+
+        try
+        {
+            return LoadBitmapFromBase64(base64);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

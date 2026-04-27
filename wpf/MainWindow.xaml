@@ -1,27 +1,31 @@
-﻿<Window x:Class="wpf.MainWindow"
+﻿<controls:MetroWindow x:Class="wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="http://metro.mahapps.com/winfx/xaml/controls"
         xmlns:local="clr-namespace:wpf"
         mc:Ignorable="d"
         Title="UI Critic Studio" Height="780" Width="1320"
-        Background="#1B1C24">
+    FontFamily="Segoe UI Variable Text, Segoe UI"
+    GlowBrush="{DynamicResource AccentColorBrush}"
+    WindowStartupLocation="CenterScreen"
+    Background="#F4F7FB">
 
-    <Window.Resources>
+    <controls:MetroWindow.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <local:BoolToVisibilityInverseConverter x:Key="BoolToVisInv"/>
         <local:TruncateConverter x:Key="Truncate"/>
         <local:NonEmptyStringToVisibilityConverter x:Key="NonEmptyToVis"/>
 
-        <SolidColorBrush x:Key="BgPanel" Color="#262A38"/>
-        <SolidColorBrush x:Key="BgCard" Color="#31384B"/>
-        <SolidColorBrush x:Key="Accent" Color="#F08A4B"/>
-        <SolidColorBrush x:Key="AccentHover" Color="#F4A676"/>
-        <SolidColorBrush x:Key="TextPrimary" Color="#F3F5FB"/>
-        <SolidColorBrush x:Key="TextSecondary" Color="#B3BCD3"/>
-        <SolidColorBrush x:Key="BorderColor" Color="#444F69"/>
-        <SolidColorBrush x:Key="DangerColor" Color="#EF6F6C"/>
+        <SolidColorBrush x:Key="BgPanel" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BgCard" Color="#F8FAFD"/>
+        <SolidColorBrush x:Key="Accent" Color="#0D6EFD"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#0B5ED7"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#1F2937"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#6C757D"/>
+        <SolidColorBrush x:Key="BorderColor" Color="#DDE3EE"/>
+        <SolidColorBrush x:Key="DangerColor" Color="#DC3545"/>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource Accent}"/>
@@ -70,7 +74,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#3A4360"/>
+                                <Setter Property="Background" Value="#E7EEF9"/>
                                 <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -117,10 +121,10 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Style.Triggers>
                 <Trigger Property="IsHighlighted" Value="True">
-                    <Setter Property="Background" Value="#3A4360"/>
+                    <Setter Property="Background" Value="#E7EEF9"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#465173"/>
+                    <Setter Property="Background" Value="#D9E5F8"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -169,7 +173,7 @@
                                                           TextElement.Foreground="{TemplateBinding Foreground}"/>
 
                                         <Border Grid.Column="1"
-                                                Background="#3A4360"
+                                                Background="#E7EEF9"
                                                 CornerRadius="0,6,6,0"
                                                 BorderBrush="{TemplateBinding BorderBrush}"
                                                 BorderThickness="1,0,0,0">
@@ -227,13 +231,13 @@
 
         <Style x:Key="TraitValueText" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="Background" Value="#1E2433"/>
+            <Setter Property="Background" Value="#ECF2FC"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="MinWidth" Value="36"/>
             <Setter Property="Padding" Value="4,1"/>
         </Style>
-    </Window.Resources>
+    </controls:MetroWindow.Resources>
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -267,7 +271,7 @@
                             <TextBlock Grid.Row="1" Text="Selectionnez les profils de testeur a utiliser pour la critique." Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,10" TextWrapping="Wrap"/>
                             <Button Grid.Row="2" Content="Ajouter une personnalite" Style="{StaticResource SecondaryButton}" Command="{Binding AddPersonalityCommand}" Margin="0,0,0,10"/>
 
-                            <Border Grid.Row="3" Background="#222838" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border Grid.Row="3" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="8">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                                     <ItemsControl ItemsSource="{Binding Personalities}">
                                         <ItemsControl.ItemTemplate>
@@ -275,11 +279,17 @@
                                                 <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="6" Margin="0,0,0,6" Padding="8">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Content="{Binding Name}" VerticalAlignment="Center"/>
-                                                        <Button Grid.Column="1" Content="Editer" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+
+                                                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="17" Background="#E7EEF9" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                            <Image Source="{Binding AvatarImage}" Stretch="UniformToFill"/>
+                                                        </Border>
+
+                                                        <CheckBox Grid.Column="1" IsChecked="{Binding IsSelected, Mode=TwoWay}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Content="{Binding Name}" VerticalAlignment="Center"/>
+                                                        <Button Grid.Column="2" Content="Editer" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
                                                                 Command="{Binding DataContext.EditPersonalityCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"/>
                                                     </Grid>
@@ -331,14 +341,14 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                                 <ComboBox.Resources>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#31384B"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#31384B"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#3A4360"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#3A4360"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F3F5FB"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F3F5FB"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#3A4360"/>
-                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#F3F5FB"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FFFFFF"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FFFFFF"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#E7EEF9"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#E7EEF9"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#1F2937"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#1F2937"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#D9E5F8"/>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1F2937"/>
                                 </ComboBox.Resources>
                             </ComboBox>
                             <Button Style="{StaticResource PrimaryButton}" Content="Choisir une image" Command="{Binding SelectImageCommand}" Margin="0,0,10,0"/>
@@ -363,7 +373,7 @@
                                                         <TextBlock Text="{Binding RatingDisplay}" Foreground="{StaticResource Accent}" FontWeight="Bold"/>
                                                     </DockPanel>
                                                 </Expander.Header>
-                                                <Border Background="#232938" Padding="10">
+                                                <Border Background="{StaticResource BgCard}" Padding="10">
                                                     <TextBlock Text="{Binding CritiqueText}" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
                                                 </Border>
                                             </Expander>
@@ -432,6 +442,8 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
@@ -441,7 +453,7 @@
                             <TextBlock Grid.Row="1" Text="Nom" Style="{StaticResource SectionLabel}"/>
                             <TextBox Grid.Row="2" Style="{StaticResource DarkTextBox}" Text="{Binding PersonalityEditorName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
 
-                            <TextBlock Grid.Row="3" Text="Role" Style="{StaticResource SectionLabel}"/>
+                            <TextBlock Grid.Row="3" Text="Description du testeur" Style="{StaticResource SectionLabel}"/>
                             <TextBox Grid.Row="4" Style="{StaticResource DarkTextBox}" Text="{Binding PersonalityEditorRole, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70" Margin="0,0,0,10"/>
 
                             <TextBlock Grid.Row="5" Text="Traits du testeur (sliders)" Style="{StaticResource SectionLabel}"/>
@@ -489,7 +501,17 @@
                                 <CheckBox Style="{StaticResource DarkCheckBox}" Content="Faible aisance numerique" IsChecked="{Binding EditorLowDigitalLiteracyFlag, Mode=TwoWay}"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Grid.Row="9" Text="Personnalite finale" Style="{StaticResource SectionLabel}"/>
+                            <TextBox Grid.Row="10" Style="{StaticResource DarkTextBox}" Text="{Binding PersonalityEditorFinal, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="120" Margin="0,0,0,10"/>
+
+                            <StackPanel Grid.Row="11" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10">
+                                <Button Style="{StaticResource SecondaryButton}" Content="AI Generer" Command="{Binding GeneratePersonalityCommand}" Margin="0,0,10,0"/>
+                                <Border Width="42" Height="42" CornerRadius="21" Background="#E7EEF9" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Image Source="{Binding EditorAvatarImage}" Stretch="UniformToFill"/>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="13" Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Button Style="{StaticResource SecondaryButton}" Content="Annuler" Command="{Binding CancelPersonalityCommand}" Margin="0,0,8,0"/>
                                 <Button Style="{StaticResource PrimaryButton}" Content="Enregistrer" Command="{Binding SavePersonalityCommand}"/>
                             </StackPanel>
@@ -511,7 +533,7 @@
 
         <!-- API Key Alert Banner -->
         <Border Grid.Row="1"
-                Background="#3A1F1E" BorderBrush="{StaticResource DangerColor}"
+                Background="#FDEDED" BorderBrush="{StaticResource DangerColor}"
                 BorderThickness="0,1,0,0" Margin="-16,8,-16,0" Padding="16,10"
                 Visibility="{Binding ApiKeyMissing, Converter={StaticResource BoolToVis}}">
             <Grid>
@@ -547,4 +569,4 @@
             <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
         </Border>
     </Grid>
-</Window>
+</controls:MetroWindow>

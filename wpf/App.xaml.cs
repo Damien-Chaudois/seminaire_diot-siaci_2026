@@ -26,14 +26,18 @@ public partial class App : Application
 
         IHistoryRepository historyRepo = new HistoryRepository(dbPath);
         historyRepo.Initialize();
+        IPersonalityRepository personalityRepo = new PersonalityRepository(dbPath);
+        personalityRepo.Initialize();
 
         // Composer les services
         IApiService apiService = new ApiService();
+        IDiceBearAvatarService diceBearAvatarService = new DiceBearAvatarService();
         IImageService imageService = new ImageService();
         ILlmService llmService = new LlmService(apiService);
         IHistoryService historyService = new HistoryService(historyRepo);
+        IPersonalityService personalityService = new PersonalityService(personalityRepo);
 
-        var viewModel = new MainViewModel(imageService, llmService, historyService, apiService);
+        var viewModel = new MainViewModel(imageService, llmService, historyService, personalityService, apiService, diceBearAvatarService);
         var window = new MainWindow(viewModel);
         window.Show();
     }

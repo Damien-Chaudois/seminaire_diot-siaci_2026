@@ -159,6 +159,49 @@ public class ApiService : IApiService
         return content ?? string.Empty;
     }
 
+    public async Task<string> SendTextAsync(string prompt)
+    {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            throw new InvalidOperationException("Clé API non configurée. Veuillez renseigner GITHUB_PAT dans le fichier .env.");
+
+        if (string.IsNullOrWhiteSpace(_model))
+            throw new InvalidOperationException("Aucun modele configure. Renseignez MODEL_NAMES ou MODEL_NAME dans le fichier .env.");
+
+        var requestBody = new
+        {
+            model = _model,
+            messages = new[]
+            {
+                new
+                {
+                    role = "user",
+                    content = prompt
+                }
+            },
+            max_tokens = 1024
+        };
+
+        var json = JsonSerializer.Serialize(requestBody);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chat/completions");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        using var response = await _httpClient.SendAsync(request);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Erreur API ({response.StatusCode}): {responseBody}");
+
+        using var doc = JsonDocument.Parse(responseBody);
+        var content = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+
+        return content ?? string.Empty;
+    }
+
     private static List<string> BuildModelList(IEnumerable<string> configuredModels, string defaultModel)
     {
         var models = new List<string>();

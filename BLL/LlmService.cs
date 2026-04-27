@@ -15,4 +15,9 @@ public class LlmService : ILlmService
     {
         return _apiService.SendImageAsync(base64Image, extension, personalityInstruction);
     }
+
+    public Task<string> GenerateTesterPersonalityAsync(string generationPrompt)
+    {
+        return _apiService.SendTextAsync(generationPrompt);
+    }
 }
