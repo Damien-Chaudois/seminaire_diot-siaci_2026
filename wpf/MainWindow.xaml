@@ -5,8 +5,349 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="LLM Image Analyzer" Height="750" Width="1100"
+        Background="#1E1E2E">
 
+    <Window.Resources>
+        <!-- ── Converters ── -->
+        <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <local:BoolToVisibilityInverseConverter x:Key="BoolToVisInv"/>
+        <local:TruncateConverter x:Key="Truncate"/>
+
+        <!-- ── Couleurs ── -->
+        <SolidColorBrush x:Key="BgDark"        Color="#1E1E2E"/>
+        <SolidColorBrush x:Key="BgPanel"       Color="#27273A"/>
+        <SolidColorBrush x:Key="BgCard"        Color="#313145"/>
+        <SolidColorBrush x:Key="Accent"        Color="#7C6AFA"/>
+        <SolidColorBrush x:Key="AccentHover"   Color="#9D8FFB"/>
+        <SolidColorBrush x:Key="TextPrimary"   Color="#CDD6F4"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#A6ADC8"/>
+        <SolidColorBrush x:Key="BorderColor"   Color="#45475A"/>
+        <SolidColorBrush x:Key="DangerColor"   Color="#F38BA8"/>
+
+        <!-- ── Bouton principal ── -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource Accent}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Padding"         Value="16,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Bouton historique ── -->
+        <Style x:Key="HistoryButton" TargetType="Button">
+            <Setter Property="Background"              Value="{StaticResource BgCard}"/>
+            <Setter Property="Foreground"              Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush"             Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness"         Value="1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding"                 Value="12,8"/>
+            <Setter Property="Margin"                  Value="0,3"/>
+            <Setter Property="Cursor"                  Value="Hand"/>
+            <Setter Property="FontSize"                Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#3E3E5A"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── TextBox sombre ── -->
+        <Style x:Key="DarkTextBox" TargetType="TextBox">
+            <Setter Property="Background"      Value="{StaticResource BgCard}"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"         Value="8,6"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="CaretBrush"      Value="{StaticResource TextPrimary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="4"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── ComboBox sombre ── -->
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Background"      Value="{StaticResource BgCard}"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"         Value="8,6"/>
+            <Setter Property="FontSize"        Value="12"/>
+        </Style>
+
+        <!-- ── Label section ── -->
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize"   Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin"     Value="0,0,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="400"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════════════════════════ PANNEAU GAUCHE ═══════════════════════ -->
+        <Grid Grid.Column="0" Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Titre -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="LLM Image Analyzer"
+                           Foreground="{StaticResource Accent}"
+                           FontSize="20" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock Text="Uploadez une image JPG/PNG pour l'analyser avec un LLM."
+                           Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+            </StackPanel>
+
+            <!-- Zone aperçu image -->
+            <Border Grid.Row="1"
+                    Background="{StaticResource BgPanel}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1" CornerRadius="10"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <!-- Placeholder -->
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Visibility="{Binding HasImage, Converter={StaticResource BoolToVisInv}}">
+                        <TextBlock Text="&#128193;" FontSize="48" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource BorderColor}"/>
+                        <TextBlock Text="Aucune image sélectionnée"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Text="JPG · PNG"
+                                   Foreground="{StaticResource BorderColor}"
+                                   FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Aperçu image -->
+                    <Image Source="{Binding PreviewImage}"
+                           Stretch="Uniform"
+                           MaxHeight="380"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"
+                           Margin="8"/>
+                </Grid>
+            </Border>
+
+            <!-- Prompt -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,10">
+                <TextBlock Text="PROMPT" Style="{StaticResource SectionLabel}"/>
+                <TextBox Style="{StaticResource DarkTextBox}"
+                         Text="{Binding Prompt, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         MinHeight="60" MaxHeight="100"
+                         VerticalScrollBarVisibility="Auto"/>
+            </StackPanel>
+
+            <!-- Boutons action -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,10">
+                <Button Style="{StaticResource PrimaryButton}"
+                        Content="Choisir une image"
+                        Command="{Binding SelectImageCommand}"
+                        Margin="0,0,10,0"/>
+                <Button Style="{StaticResource PrimaryButton}"
+                        Content="Envoyer au LLM"
+                        Command="{Binding SendToApiCommand}"/>
+            </StackPanel>
+
+            <!-- Indicateur chargement -->
+            <StackPanel Grid.Row="4" Orientation="Horizontal"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                <ProgressBar IsIndeterminate="True" Width="160" Height="6"
+                             Foreground="{StaticResource Accent}"
+                             Background="{StaticResource BgCard}"
+                             VerticalAlignment="Center"/>
+                <TextBlock Text="  Analyse en cours..."
+                           Foreground="{StaticResource Accent}"
+                           FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════════════════════════ PANNEAU DROIT ════════════════════════ -->
+        <Grid Grid.Column="2" Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="2*"/>
+                <RowDefinition Height="16"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ── Résultats : ComboBox de blocs de texte ── -->
+            <TextBlock Grid.Row="0" Text="BLOCS DE RÉSULTAT" Style="{StaticResource SectionLabel}"/>
+            <ComboBox Grid.Row="1"
+                      Style="{StaticResource DarkComboBox}"
+                      ItemsSource="{Binding ResultBlocks}"
+                      SelectedItem="{Binding SelectedResultBlock}"
+                      Margin="0,0,0,8">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="340"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <!-- Zone texte résultat complet -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource BgPanel}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1" CornerRadius="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4">
+                    <TextBox Background="Transparent"
+                             Foreground="{StaticResource TextPrimary}"
+                             BorderThickness="0"
+                             Text="{Binding SelectedResultBlock, Mode=OneWay}"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             FontSize="13"
+                             Padding="8"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- ── Historique : grande liste déroulante de boutons ── -->
+            <TextBlock Grid.Row="4" Text="HISTORIQUE" Style="{StaticResource SectionLabel}" Margin="0,0,0,6"/>
+
+            <Border Grid.Row="5"
+                    Background="{StaticResource BgPanel}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="1" CornerRadius="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6">
+                    <ItemsControl ItemsSource="{Binding HistoryEntries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Bouton large de restauration -->
+                                    <Button Grid.Column="0"
+                                            Style="{StaticResource HistoryButton}"
+                                            Command="{Binding DataContext.RestoreHistoryCommand,
+                                                      RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding CreatedAt, StringFormat='&#128197; {0:dd/MM/yyyy HH:mm}'}"
+                                                       Foreground="{StaticResource Accent}"
+                                                       FontSize="11" FontWeight="SemiBold"/>
+                                            <TextBlock Foreground="{StaticResource TextPrimary}"
+                                                       FontSize="12" Margin="0,2,0,0"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Text="{Binding ResultText,
+                                                              Converter={StaticResource Truncate},
+                                                              ConverterParameter=80}"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Bouton supprimer -->
+                                    <Button Grid.Column="1"
+                                            Content="✕"
+                                            Margin="4,3,0,3"
+                                            Padding="8,4"
+                                            Background="Transparent"
+                                            Foreground="{StaticResource DangerColor}"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            ToolTip="Supprimer"
+                                            Command="{Binding DataContext.DeleteHistoryCommand,
+                                                      RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        CornerRadius="6"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#3A2030"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════════════ BARRE DE STATUT ═════════════════════════════════ -->
+        <Border Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="1"
+                Background="{StaticResource BgPanel}"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="0,1,0,0"
+                Margin="-16,12,-16,-16"
+                Padding="16,8">
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="{StaticResource TextSecondary}"
+                       FontSize="12"/>
+        </Border>
     </Grid>
 </Window>
