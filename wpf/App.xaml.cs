@@ -13,9 +13,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Charger le .env depuis la racine du repo (deux niveaux au-dessus de l'exe)
-        var envPath = FindEnvFile();
-        EnvService.Load(envPath);
+        // Définir les variables d'environnement directement
+        Environment.SetEnvironmentVariable("API_BASE_URL", "https://models.inference.ai.azure.com");
+        Environment.SetEnvironmentVariable("MODEL_NAMES", "gpt-4o,gpt-4.1,gpt-4.1-mini,gpt-4o-mini");
 
         // Initialiser la base de données SQLite
         var dbPath = Path.Combine(
@@ -28,6 +28,15 @@ public partial class App : Application
         historyRepo.Initialize();
         IPersonalityRepository personalityRepo = new PersonalityRepository(dbPath);
         personalityRepo.Initialize();
+        IConfigRepository configRepo = new ConfigRepository(dbPath);
+        configRepo.Initialize();
+
+        // Récupérer la clé API depuis la configuration
+        string? apiKey = configRepo.Get("GITHUB_PAT");
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            Environment.SetEnvironmentVariable("GITHUB_PAT", apiKey);
+        }
 
         // Composer les services
         IApiService apiService = new ApiService();
@@ -37,24 +46,10 @@ public partial class App : Application
         IHistoryService historyService = new HistoryService(historyRepo);
         IPersonalityService personalityService = new PersonalityService(personalityRepo);
 
-        var viewModel = new MainViewModel(imageService, llmService, historyService, personalityService, apiService, diceBearAvatarService);
+        var viewModel = new MainViewModel(imageService, llmService, historyService, personalityService, apiService, diceBearAvatarService, configRepo);
         var window = new MainWindow(viewModel);
         window.Show();
     }
-
-    private static string FindEnvFile()
-    {
-        // Remonte depuis le répertoire courant pour trouver .env
-        var dir = AppDomain.CurrentDomain.BaseDirectory;
-        for (int i = 0; i < 6; i++)
-        {
-            var candidate = Path.Combine(dir, ".env");
-            if (File.Exists(candidate)) return candidate;
-            var parent = Directory.GetParent(dir);
-            if (parent is null) break;
-            dir = parent.FullName;
-        }
-        return ".env"; // fallback
-    }
 }
+
 

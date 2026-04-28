@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using BLL;
+using DAL;
 using DAL.Models;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -270,6 +271,7 @@ public class MainViewModel : ViewModelBase
     private readonly IPersonalityService _personalityService;
     private readonly Services.IApiService _apiService;
     private readonly Services.IDiceBearAvatarService _diceBearAvatarService;
+    private readonly IConfigRepository _configRepository;
     private PersonalityOption? _editingPersonality;
 
     // ── Image ────────────────────────────────────────────────────────────────
@@ -416,7 +418,8 @@ public class MainViewModel : ViewModelBase
         IHistoryService historyService,
         IPersonalityService personalityService,
         Services.IApiService apiService,
-        Services.IDiceBearAvatarService diceBearAvatarService)
+        Services.IDiceBearAvatarService diceBearAvatarService,
+        IConfigRepository configRepository)
     {
         _imageService = imageService;
         _llmService = llmService;
@@ -424,6 +427,7 @@ public class MainViewModel : ViewModelBase
         _personalityService = personalityService;
         _apiService = apiService;
         _diceBearAvatarService = diceBearAvatarService;
+        _configRepository = configRepository;
 
         SelectImageCommand = new RelayCommand(_ => SelectImage());
         SendToApiCommand = new RelayCommandAsync(_ => SendToApiAsync(), _ => HasImage && !IsLoading && !string.IsNullOrWhiteSpace(SelectedModel));
@@ -438,6 +442,13 @@ public class MainViewModel : ViewModelBase
         RegenerateAvatarCommand = new RelayCommandAsync(entry => RegenerateAvatarAsync(entry as PersonalityOption), entry => entry is PersonalityOption personality && !personality.IsAvatarRefreshing);
         ResetCommand = new RelayCommand(_ => ResetInterface());
         ValidateApiKeyCommand = new RelayCommandAsync(_ => ValidateApiKeyAsync(), _ => !string.IsNullOrWhiteSpace(ApiKeyInput));
+
+        // Charger la clé API depuis la DB
+        var storedApiKey = _configRepository.Get("GITHUB_PAT");
+        if (!string.IsNullOrWhiteSpace(storedApiKey))
+        {
+            _apiService.SetApiKey(storedApiKey);
+        }
 
         ApiKeyMissing = !_apiService.HasApiKey;
         ApiKeyInput = _apiService.CurrentApiKey;
@@ -482,8 +493,9 @@ public class MainViewModel : ViewModelBase
         if (valid)
         {
             _apiService.SetApiKey(key);
+            _configRepository.Set("GITHUB_PAT", key);
             ApiKeyMissing = false;
-            StatusMessage = "Clé API validée.";
+            StatusMessage = "Clé API validée et sauvegardée.";
         }
         else
         {

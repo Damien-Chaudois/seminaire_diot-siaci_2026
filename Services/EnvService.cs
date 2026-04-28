@@ -29,6 +29,11 @@ public static class EnvService
 
     public static string Get(string key)
     {
-        return _values.TryGetValue(key, out var value) ? value : string.Empty;
+        // Chercher d'abord dans le dictionnaire interne
+        if (_values.TryGetValue(key, out var value))
+            return value;
+        
+        // Fallback vers les variables d'environnement système
+        return Environment.GetEnvironmentVariable(key) ?? string.Empty;
     }
 }
